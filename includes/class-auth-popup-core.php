@@ -1,0 +1,330 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+
+class Auth_Popup_Core {
+
+    private static ?Auth_Popup_Core $instance = null;
+
+    /** Batch size for the billing_phone migration job */
+    private const MIGRATION_BATCH = 200;
+
+    public static function get_instance(): Auth_Popup_Core {
+        if ( null === self::$instance ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    public function run(): void {
+        $this->load_textdomain();
+
+        // Upgrade DB tables if needed (handles already-active installs)
+        if ( get_option( 'auth_popup_db_version' ) !== '1.2' ) {
+            self::create_tables();
+        }
+
+        // Register the migration batch hook (needed for both Action Scheduler & WP-Cron)
+        add_action( 'auth_popup_migrate_phones_batch',   [ __CLASS__, 'run_migration_batch'          ] );
+        add_action( 'auth_popup_import_wc_addresses',    [ __CLASS__, 'run_wc_address_import_batch'  ] );
+
+        // Kick off WC address import if not yet done
+        if ( ! get_option( 'auth_popup_wc_address_import_done' ) ) {
+            self::schedule_wc_address_import( 0 );
+        }
+
+        // Boot modules
+        Auth_Popup_Ajax_Handler::init();
+        Auth_Popup_Admin_Settings::init();
+        Auth_Popup_Public_Frontend::init();
+    }
+
+    private function load_textdomain(): void {
+        load_plugin_textdomain(
+            'auth-popup',
+            false,
+            dirname( AUTH_POPUP_BASENAME ) . '/languages'
+        );
+    }
+
+    /* ── Activation / Deactivation ─────────────────────────────────── */
+
+    public static function activate(): void {
+        self::create_tables();
+
+        // Set default options if not present
+        if ( ! get_option( 'auth_popup_settings' ) ) {
+            update_option( 'auth_popup_settings', self::default_settings() );
+        }
+
+        // Schedule background migration of existing billing_phone entries
+        self::schedule_migration_batch( 0 );
+
+        // Schedule import of existing WC addresses into the address book
+        delete_option( 'auth_popup_wc_address_import_done' );
+        self::schedule_wc_address_import( 0 );
+
+        flush_rewrite_rules();
+    }
+
+    public static function deactivate(): void {
+        flush_rewrite_rules();
+    }
+
+    /* ── DB Table Creation ─────────────────────────────────────────── */
+
+    /**
+     * Create / upgrade plugin tables. Safe to call on every load via db version check.
+     */
+    public static function create_tables(): void {
+        global $wpdb;
+        $charset = $wpdb->get_charset_collate();
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        // OTP rate-limit log
+        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}auth_popup_otp_log (
+            id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            phone       VARCHAR(20)     NOT NULL,
+            ip_address  VARCHAR(45)     NOT NULL DEFAULT '',
+            sent_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY phone   (phone),
+            KEY sent_at (sent_at)
+        ) {$charset};" );
+
+        // User profiles — fast indexed lookups by phone / OAuth ID
+        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}auth_popup_user_profiles (
+            user_id          BIGINT(20) UNSIGNED NOT NULL,
+            phone            VARCHAR(20)         DEFAULT NULL,
+            google_id        VARCHAR(100)        DEFAULT NULL,
+            facebook_id      VARCHAR(100)        DEFAULT NULL,
+            google_avatar    VARCHAR(500)        DEFAULT NULL,
+            facebook_avatar  VARCHAR(500)        DEFAULT NULL,
+            PRIMARY KEY      (user_id),
+            UNIQUE KEY phone       (phone),
+            KEY        google_id   (google_id),
+            KEY        facebook_id (facebook_id)
+        ) {$charset};" );
+
+        // User address book — multiple shipping addresses per user
+        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}auth_popup_user_addresses (
+            id          BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT,
+            user_id     BIGINT(20) UNSIGNED NOT NULL,
+            label       VARCHAR(100)        NOT NULL DEFAULT '',
+            first_name  VARCHAR(100)        NOT NULL DEFAULT '',
+            last_name   VARCHAR(100)        NOT NULL DEFAULT '',
+            company     VARCHAR(200)        NOT NULL DEFAULT '',
+            address_1   VARCHAR(200)        NOT NULL DEFAULT '',
+            address_2   VARCHAR(200)        NOT NULL DEFAULT '',
+            city        VARCHAR(100)        NOT NULL DEFAULT '',
+            state       VARCHAR(100)        NOT NULL DEFAULT '',
+            postcode    VARCHAR(20)         NOT NULL DEFAULT '',
+            country     VARCHAR(2)          NOT NULL DEFAULT 'BD',
+            phone       VARCHAR(20)         NOT NULL DEFAULT '',
+            is_default  TINYINT(1)          NOT NULL DEFAULT 0,
+            created_at  DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY user_id    (user_id),
+            KEY user_default (user_id, is_default)
+        ) {$charset};" );
+
+        update_option( 'auth_popup_db_version', '1.2' );
+    }
+
+    /* ── Background Phone Migration ────────────────────────────────── */
+
+    /**
+     * Schedule the next migration batch using Action Scheduler (preferred,
+     * bundled with WooCommerce) or WP-Cron as fallback.
+     */
+    private static function schedule_migration_batch( int $offset ): void {
+        if ( get_option( 'auth_popup_phone_migration_done' ) ) {
+            return;
+        }
+
+        if ( function_exists( 'as_schedule_single_action' ) ) {
+            // Action Scheduler — runs reliably in background, not tied to page loads
+            as_schedule_single_action(
+                time() + 5,
+                'auth_popup_migrate_phones_batch',
+                [ $offset ],
+                'auth-popup'
+            );
+        } else {
+            // WP-Cron fallback
+            wp_schedule_single_event(
+                time() + 10,
+                'auth_popup_migrate_phones_batch',
+                [ $offset ]
+            );
+        }
+    }
+
+    /**
+     * Process one batch of billing_phone → profiles table migration.
+     * Called by Action Scheduler or WP-Cron. Re-schedules itself until done.
+     */
+    public static function run_migration_batch( int $offset = 0 ): void {
+        global $wpdb;
+
+        $rows = $wpdb->get_results( $wpdb->prepare(
+            "SELECT user_id, meta_value
+             FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_phone'
+               AND meta_value != ''
+             LIMIT %d OFFSET %d",
+            self::MIGRATION_BATCH,
+            $offset
+        ) );
+
+        // No more rows — migration complete
+        if ( empty( $rows ) ) {
+            update_option( 'auth_popup_phone_migration_done', '1' );
+            return;
+        }
+
+        $profiles_table = $wpdb->prefix . 'auth_popup_user_profiles';
+
+        foreach ( $rows as $row ) {
+            $normalized = Auth_Popup_SMS_Service::normalise_phone( $row->meta_value );
+
+            // Skip if normalisation produced something unusable
+            if ( strlen( $normalized ) < 11 ) {
+                continue;
+            }
+
+            // Insert only — do not overwrite a phone already set by the plugin
+            $wpdb->query( $wpdb->prepare(
+                "INSERT INTO {$profiles_table} (user_id, phone)
+                 VALUES (%d, %s)
+                 ON DUPLICATE KEY UPDATE
+                     phone = IF(phone IS NULL OR phone = '', VALUES(phone), phone)",
+                (int) $row->user_id,
+                $normalized
+            ) );
+        }
+
+        // Schedule the next batch
+        self::schedule_migration_batch( $offset + self::MIGRATION_BATCH );
+    }
+
+    /* ── WC Address Import Migration ──────────────────────────────── */
+
+    /**
+     * Schedule one batch of the WC address import using Action Scheduler
+     * (bundled with WooCommerce) or WP-Cron as fallback.
+     */
+    public static function schedule_wc_address_import( int $offset ): void {
+        if ( get_option( 'auth_popup_wc_address_import_done' ) ) {
+            return;
+        }
+
+        if ( function_exists( 'as_schedule_single_action' ) ) {
+            as_schedule_single_action(
+                time() + 5,
+                'auth_popup_import_wc_addresses',
+                [ $offset ],
+                'auth-popup'
+            );
+        } else {
+            wp_schedule_single_event(
+                time() + 10,
+                'auth_popup_import_wc_addresses',
+                [ $offset ]
+            );
+        }
+    }
+
+    /**
+     * Process one batch: find users with WC billing addresses and import
+     * them into wp_auth_popup_user_addresses (skips users who already
+     * have entries in that table).
+     */
+    public static function run_wc_address_import_batch( int $offset = 0 ): void {
+        global $wpdb;
+
+        $user_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT user_id
+             FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_first_name'
+               AND meta_value != ''
+             ORDER BY user_id ASC
+             LIMIT %d OFFSET %d",
+            self::MIGRATION_BATCH,
+            $offset
+        ) );
+
+        // No more users — import complete
+        if ( empty( $user_ids ) ) {
+            update_option( 'auth_popup_wc_address_import_done', '1' );
+            return;
+        }
+
+        foreach ( $user_ids as $user_id ) {
+            Auth_Popup_Address_Manager::import_from_wc( (int) $user_id );
+        }
+
+        // Schedule the next batch
+        self::schedule_wc_address_import( $offset + self::MIGRATION_BATCH );
+    }
+
+    /**
+     * Return the current import progress for admin display.
+     */
+    public static function wc_address_import_status(): array {
+        global $wpdb;
+
+        $done  = (bool) get_option( 'auth_popup_wc_address_import_done' );
+        $total = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_first_name' AND meta_value != ''"
+        );
+        $imported = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->prefix}auth_popup_user_addresses"
+        );
+
+        return compact( 'done', 'total', 'imported' );
+    }
+
+    /* ── Settings ──────────────────────────────────────────────────── */
+
+    public static function default_settings(): array {
+        return [
+            // SMS
+            'sms_api_token'         => '',
+            'sms_sender_id'         => '',
+            'sms_base_url'          => 'https://se.smsplus.net/api/v1',
+            // Google
+            'google_client_id'      => '',
+            'google_client_secret'  => '',
+            // Facebook
+            'fb_app_id'             => '',
+            'fb_app_secret'         => '',
+            // Loyalty
+            'loyalty_enabled'       => '1',
+            'loyalty_api_url'       => '',
+            // General
+            'redirect_url'          => home_url(),
+            'trigger_selector'      => '.auth-popup-trigger',
+            'otp_expiry_minutes'    => 5,
+            'otp_max_per_hour'      => 5,
+            'enable_password_login' => '1',
+            'enable_otp_login'      => '1',
+            'enable_google'         => '1',
+            'enable_facebook'       => '1',
+            'popup_logo_url'        => '',
+            'popup_brand_name'      => get_bloginfo( 'name' ),
+            // Checkout
+            'checkout_hide_shipping_form'       => '1',
+            'checkout_disable_ship_to_different'=> '1',
+        ];
+    }
+
+    /**
+     * Retrieve a specific setting value.
+     */
+    public static function get_setting( string $key, $default = null ) {
+        $settings = get_option( 'auth_popup_settings', self::default_settings() );
+        return $settings[ $key ] ?? $default;
+    }
+}

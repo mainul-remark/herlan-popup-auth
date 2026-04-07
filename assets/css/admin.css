@@ -1,0 +1,53 @@
+/* Auth Popup — Admin Styles */
+.auth-popup-admin h1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.5rem;
+}
+.auth-popup-admin h1 .dashicons {
+    color: #F85606;
+    font-size: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+.auth-popup-tabs {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 0 0 20px;
+    margin-top: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.auth-popup-tabs .nav-tab-wrapper {
+    padding: 0 16px;
+    border-bottom: 1px solid #ccd0d4;
+    background: #f9f9f9;
+    border-radius: 4px 4px 0 0;
+}
+.auth-popup-tab-content {
+    display: none;
+    padding: 20px 20px 0;
+}
+.auth-popup-tab-content.active {
+    display: block;
+}
+.auth-popup-shortcode-info {
+    background: #f0f7ff;
+    border-left: 4px solid #2271b1;
+    padding: 16px 20px;
+    margin-top: 24px;
+    border-radius: 0 4px 4px 0;
+}
+.auth-popup-shortcode-info code {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: .9rem;
+    margin: 4px 0;
+}
+.form-table th {
+    width: 220px;
+}
