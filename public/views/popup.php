@@ -18,15 +18,15 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
     <div class="ap-dialog" role="document">
 
         <!-- Back / Close header button -->
-        <button class="ap-header-back" id="ap-header-back-btn" aria-label="<?php esc_attr_e( 'Back', 'auth-popup' ); ?>">
-            <svg width="9" height="16" viewBox="0 0 9 16" fill="none">
-                <path d="M8 1.5L1.5 8L8 14.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </button>
+<!--        <button class="ap-header-back" id="ap-header-back-btn" aria-label="--><?php //esc_attr_e( 'Back', 'auth-popup' ); ?><!--">-->
+<!--            <svg width="9" height="16" viewBox="0 0 9 16" fill="none">-->
+<!--                <path d="M8 1.5L1.5 8L8 14.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>-->
+<!--            </svg>-->
+<!--        </button>-->
 
-        <!-- Original close button (hidden — kept for JS compatibility) -->
-        <button class="ap-close" id="ap-close-btn" aria-label="<?php esc_attr_e( 'Close', 'auth-popup' ); ?>" style="display:none;">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 1l16 16M17 1L1 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <!-- Close button (top right) -->
+        <button class="ap-close" id="ap-close-btn" aria-label="<?php esc_attr_e( 'Close', 'auth-popup' ); ?>">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
         </button>
 
         <!-- Tabs — visually hidden, used by JS for panel switching -->

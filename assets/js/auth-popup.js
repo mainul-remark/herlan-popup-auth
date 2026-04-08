@@ -743,14 +743,27 @@
         /* ── Header back button ──────────────────────────────────────── */
         bindHeaderBack() {
             $('#ap-header-back-btn').on('click', () => {
+                // Register panel: navigate between steps
+                if ($('#ap-panel-register').hasClass('active')) {
+                    const activeStep = parseInt($('#ap-register-form').find('.ap-reg-step.active').data('step')) || 1;
+                    if (activeStep === 2) {
+                        this.showStep('#ap-register-form', 1, '.ap-reg-step');
+                        this.clearAlert();
+                        return;
+                    } else if (activeStep === 3) {
+                        this.showStep('#ap-register-form', 2, '.ap-reg-step');
+                        this.clearAlert();
+                        return;
+                    }
+                }
+                // Forgot panel → go back to login
                 if ($('#ap-panel-forgot').hasClass('active')) {
-                    // Forgot panel → go back to login
                     this.$overlay.find('.ap-tab[data-tab="login"]').trigger('click');
                     this.clearAlert();
-                } else {
-                    // Any other panel → close popup
-                    this.close();
+                    return;
                 }
+                // All other cases (login panel, register step 1) → close popup
+                this.close();
             });
         },
 
@@ -771,9 +784,9 @@
         // Replace "Account" label in mobile drawer: username when logged in, "Menu" when logged out
         var $drawerLabels = $('.herlan_mobile_drawer_container ul li a p');
         $drawerLabels.each(function () {
-            if ( $(this).text().trim() === 'Account' ) {
-                $(this).text( 'Menu' );
-            }
+            // if ( $(this).text().trim() === 'Account' ) {
+            //     $(this).text( 'Menu' );
+            // }
         });
 
         // ── My Account nav drawer (mobile only) ──────────────────────
