@@ -33,6 +33,9 @@
             this.bindPasswordToggle();
             this.bindPhoneCheck();
             this.bindLoyaltyToggle();
+            this.bindSwitchLinks();
+            this.bindForgotPanel();
+            this.bindHeaderBack();
             this.initGoogle();
             this.initFacebook();
             this.initCheckout();
@@ -130,12 +133,32 @@
                 const form  = $btn.data('form'); // 'login' or 'register'
                 const phone = this.getPhoneFromForm(form);
 
+                if (form === 'register') {
+                    const name = $('#ap-reg-name').val().trim();
+                    if (!name) {
+                        this.showAlert('error', this.i18n('Please enter your name.'));
+                        return;
+                    }
+                }
+
                 if (!phone || phone.length < 10) {
                     this.showAlert('error', this.i18n('Please enter a valid mobile number.'));
                     return;
                 }
 
                 // Validate loyalty fields if checkbox is ticked (register form only)
+                // Confirm password check (client-side only)
+                if (form === 'register') {
+                    const $pass    = $('#ap-reg-password');
+                    const $confirm = $('#ap-reg-confirm-password');
+                    if ($pass.length && $confirm.length && $confirm.val()) {
+                        if ($pass.val() !== $confirm.val()) {
+                            this.showAlert('error', this.i18n('Passwords do not match. Please check and try again.'));
+                            return;
+                        }
+                    }
+                }
+
                 if (form === 'register' && !this.validateLoyaltyFields()) {
                     return;
                 }
@@ -291,6 +314,12 @@
                 this.clearAlert();
             });
 
+            // Back from step 3 → step 2 in register flow
+            this.$overlay.on('click', '.ap-back-to-step2-btn', () => {
+                this.showStep('#ap-register-form', 2, '.ap-reg-step');
+                this.clearAlert();
+            });
+
             // Resend OTP
             this.$overlay.on('click', '.ap-resend-btn', (e) => {
                 const form  = $(e.currentTarget).data('form');
@@ -356,6 +385,19 @@
                     return;
                 }
                 this.submitForm($form, 'auth_popup_register');
+            });
+
+            // Register: Verify OTP (step 2 → step 3)
+            this.$overlay.on('click', '.ap-verify-reg-otp-btn', (e) => {
+                const $form = $(e.currentTarget).closest('form');
+                const otp   = $form.find('input[name="otp"]').val();
+                if (!otp || otp.length !== 6) {
+                    this.showAlert('error', this.i18n('Please enter the 6-digit OTP.'));
+                    return;
+                }
+                this.clearAlert();
+                this.showStep('#ap-register-form', 3, '.ap-reg-step');
+                setTimeout(() => $('#ap-reg-password').focus(), 100);
             });
         },
 
@@ -654,6 +696,62 @@
 
         clearAlert() {
             this.$alert.hide().text('').removeClass('ap-alert-error ap-alert-success');
+        },
+
+        /* ── Switch panel links ("Don't have an account?" etc.) ─────── */
+        bindSwitchLinks() {
+            this.$overlay.on('click', '.ap-switch-link', (e) => {
+                e.preventDefault();
+                const to = $(e.currentTarget).data('switch-to');
+                this.$overlay.find('.ap-tab[data-tab="' + to + '"]').trigger('click');
+                this.clearAlert();
+                this.$dialog.scrollTop(0);
+            });
+        },
+
+        /* ── Forgot Password panel ───────────────────────────────────── */
+        bindForgotPanel() {
+            // "Forgot Password" trigger in login form → show forgot panel
+            this.$overlay.on('click', '.ap-forgot-trigger', (e) => {
+                e.preventDefault();
+                this.$overlay.find('.ap-tab[data-tab="forgot"]').trigger('click');
+                this.clearAlert();
+                this.$dialog.scrollTop(0);
+            });
+
+            // "Continue" button in forgot panel → validate then redirect to WP lost-password page
+            this.$overlay.on('click', '#ap-forgot-submit', (e) => {
+                const $btn       = $(e.currentTarget);
+                const email      = $('#ap-forgot-email').val().trim();
+                const lostpassUrl = $btn.data('lostpass');
+
+                if (!email) {
+                    this.showAlert('error', this.i18n('Please enter your email address.'));
+                    return;
+                }
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    this.showAlert('error', this.i18n('Please enter a valid email address.'));
+                    return;
+                }
+
+                $btn.addClass('ap-loading').prop('disabled', true);
+                // Redirect to WordPress lost-password page
+                window.location.href = lostpassUrl;
+            });
+        },
+
+        /* ── Header back button ──────────────────────────────────────── */
+        bindHeaderBack() {
+            $('#ap-header-back-btn').on('click', () => {
+                if ($('#ap-panel-forgot').hasClass('active')) {
+                    // Forgot panel → go back to login
+                    this.$overlay.find('.ap-tab[data-tab="login"]').trigger('click');
+                    this.clearAlert();
+                } else {
+                    // Any other panel → close popup
+                    this.close();
+                }
+            });
         },
 
         /* ── i18n helper ────────────────────────────────────────────── */

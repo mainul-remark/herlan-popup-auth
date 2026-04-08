@@ -1,21 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════
-   Auth Popup — Frontend Styles
-   Inspired by Daraz / Lazada login popup UX
+   Auth Popup — Redesigned Frontend Styles
+   Design: Clean mobile-first, green primary, pill inputs & buttons
 ═══════════════════════════════════════════════════════════════ */
 
 :root {
-    --ap-primary:       #F85606;
-    --ap-primary-dark:  #d94800;
-    --ap-primary-light: #fff3ee;
-    --ap-secondary:     #1877F2;
+    --ap-primary:       #3BBF72;
+    --ap-primary-dark:  #2DA560;
+    --ap-primary-light: #edfaf3;
     --ap-text:          #1a1a2e;
-    --ap-text-muted:    #888;
-    --ap-border:        #e2e4ea;
+    --ap-text-muted:    #9a9aaa;
+    --ap-border:        #e8eaed;
     --ap-bg:            #ffffff;
-    --ap-radius:        10px;
-    --ap-shadow:        0 20px 60px rgba(0,0,0,.22);
+    --ap-input-bg:      #f3f5f7;
+    --ap-radius-pill:   28px;
+    --ap-radius-dialog: 24px;
+    --ap-shadow:        0 24px 64px rgba(0,0,0,.17);
     --ap-transition:    .22s cubic-bezier(.4,0,.2,1);
-    --ap-font:          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --ap-font:          -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* ── Overlay ──────────────────────────────────────────────── */
@@ -32,7 +33,7 @@
 .ap-mask {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,.55);
+    background: rgba(0,0,0,.52);
     animation: ap-fade-in var(--ap-transition) forwards;
 }
 
@@ -46,98 +47,72 @@
     position: relative;
     z-index: 1;
     background: var(--ap-bg);
-    border-radius: 16px;
+    border-radius: var(--ap-radius-dialog);
     box-shadow: var(--ap-shadow);
     width: 420px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 40px);
     overflow-y: auto;
-    padding: 32px 36px 28px;
+    padding: 28px 32px 32px;
     animation: ap-slide-up var(--ap-transition) forwards;
     scroll-behavior: smooth;
 }
 
 @keyframes ap-slide-up {
-    from { opacity: 0; transform: translateY(28px) scale(.97); }
+    from { opacity: 0; transform: translateY(24px) scale(.97); }
     to   { opacity: 1; transform: translateY(0)    scale(1);   }
 }
 
-/* ── Close button ─────────────────────────────────────────── */
-.ap-close {
+/* ── Header Back Button ───────────────────────────────────── */
+.ap-header-back {
     position: absolute;
-    top: 14px;
-    right: 14px;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: #f4f4f6;
-    border-radius: 50%;
+    top: 20px;
+    left: 20px;
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid var(--ap-border);
+    background: var(--ap-bg);
+    border-radius: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--ap-text-muted);
-    transition: background var(--ap-transition), color var(--ap-transition);
+    color: #555;
+    transition: background var(--ap-transition), border-color var(--ap-transition), color var(--ap-transition), box-shadow var(--ap-transition);
     padding: 0;
+    z-index: 2;
 }
-.ap-close:hover {
-    background: #e9e9ec;
-    color: var(--ap-text);
+.ap-header-back:hover {
+    background: #f6f6f8;
+    border-color: #c8cad0;
+    color: #1a1a2e;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
 }
-
-/* ── Brand ────────────────────────────────────────────────── */
-.ap-brand {
-    text-align: center;
-    margin-bottom: 22px;
-}
-.ap-logo {
-    max-height: 48px;
-    max-width: 160px;
-    object-fit: contain;
-}
-.ap-brand-text {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--ap-primary);
-    letter-spacing: -.5px;
+.ap-header-back:active {
+    transform: scale(.95);
 }
 
-/* ── Main tabs ────────────────────────────────────────────── */
-.ap-tabs {
-    display: flex;
-    position: relative;
-    background: #f4f4f6;
-    border-radius: 8px;
-    padding: 3px;
-    margin-bottom: 22px;
-    gap: 2px;
+/* ── Hidden tabs (JS panel switcher) ─────────────────────── */
+.ap-tabs-hidden,
+.ap-tabs-hidden * {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    overflow: hidden !important;
+    clip: rect(0,0,0,0) !important;
+    white-space: nowrap !important;
 }
-.ap-tab {
-    flex: 1;
-    padding: 9px 0;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    font-size: .95rem;
-    font-weight: 600;
-    color: var(--ap-text-muted);
-    cursor: pointer;
-    transition: color var(--ap-transition), background var(--ap-transition);
-    position: relative;
-    z-index: 1;
-}
-.ap-tab.active {
-    background: var(--ap-bg);
-    color: var(--ap-primary);
-    box-shadow: 0 1px 6px rgba(0,0,0,.1);
-}
+
+/* ── Original close button (hidden) ──────────────────────── */
+.ap-close { display: none !important; }
 
 /* ── Alert box ────────────────────────────────────────────── */
 .ap-alert {
-    padding: 10px 14px;
-    border-radius: 8px;
+    padding: 12px 16px;
+    border-radius: 14px;
     font-size: .875rem;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     line-height: 1.5;
 }
 .ap-alert.ap-alert-error {
@@ -146,9 +121,9 @@
     color: #c0392b;
 }
 .ap-alert.ap-alert-success {
-    background: #edf9f0;
+    background: var(--ap-primary-light);
     border: 1px solid #b2dfcc;
-    color: #1e7e34;
+    color: #1a7a45;
 }
 
 /* ── Panels ───────────────────────────────────────────────── */
@@ -157,134 +132,210 @@
 }
 .ap-panel.active {
     display: block;
+    animation: ap-panel-in .2s ease forwards;
+}
+@keyframes ap-panel-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Panel Header ─────────────────────────────────────────── */
+.ap-panel-header {
+    padding-top: 32px;  /* clearance for the back button */
+    margin-bottom: 26px;
+    text-align: left;
+}
+.ap-title {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: var(--ap-text);
+    margin: 0 0 8px;
+    letter-spacing: -.6px;
+    line-height: 1.15;
+}
+.ap-subtitle {
+    font-size: .875rem;
+    color: var(--ap-text-muted);
+    margin: 0;
+    line-height: 1.55;
 }
 
 /* ── Mode tabs (Password / OTP) ───────────────────────────── */
 .ap-mode-tabs {
     display: flex;
-    gap: 0;
-    border-bottom: 2px solid var(--ap-border);
+    gap: 8px;
     margin-bottom: 20px;
 }
 .ap-mode-tab {
-    padding: 8px 18px;
-    border: none;
+    padding: 6px 20px;
+    border: 1.5px solid var(--ap-border);
     background: transparent;
-    font-size: .875rem;
+    border-radius: 20px;
+    font-size: .82rem;
     font-weight: 600;
     color: var(--ap-text-muted);
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: color var(--ap-transition), border-color var(--ap-transition);
+    transition: all var(--ap-transition);
+    font-family: var(--ap-font);
 }
 .ap-mode-tab.active {
+    background: var(--ap-primary-light);
+    border-color: var(--ap-primary);
     color: var(--ap-primary);
-    border-bottom-color: var(--ap-primary);
+}
+.ap-mode-tab:hover:not(.active) {
+    border-color: #c8cad0;
+    color: var(--ap-text);
 }
 
 /* ── Forms ────────────────────────────────────────────────── */
-.ap-form {
-    display: none;
-}
-.ap-form.active {
-    display: block;
-}
+.ap-form { display: none; }
+.ap-form.active { display: block; }
 
 /* ── Fields ───────────────────────────────────────────────── */
 .ap-field {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 .ap-field label {
     display: block;
     font-size: .82rem;
     font-weight: 600;
     color: var(--ap-text);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     letter-spacing: .01em;
 }
 .ap-field label small {
     font-weight: 400;
     color: var(--ap-text-muted);
 }
+
+/* ── Input wrap — pill style ──────────────────────────────── */
 .ap-input-wrap {
     position: relative;
     display: flex;
     align-items: center;
-    border: 1.5px solid var(--ap-border);
-    border-radius: var(--ap-radius);
-    background: #fafafa;
-    transition: border-color var(--ap-transition), box-shadow var(--ap-transition);
+    border: 1.5px solid transparent;
+    border-radius: var(--ap-radius-pill);
+    background: var(--ap-input-bg);
+    transition: border-color var(--ap-transition), background var(--ap-transition), box-shadow var(--ap-transition);
     overflow: hidden;
+    height: 54px;
 }
 .ap-input-wrap:focus-within {
     border-color: var(--ap-primary);
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(248,86,6,.1);
+    box-shadow: 0 0 0 4px rgba(59,191,114,.1);
 }
 .ap-input-wrap .ap-icon {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
-    margin-left: 12px;
+    margin-left: 18px;
+    margin-right: 10px;
     color: var(--ap-text-muted);
 }
-.ap-input-wrap input {
+.ap-input-wrap input,
+.ap-input-wrap .ap-select,
+.ap-input-wrap .ap-date-input {
     flex: 1;
     border: none;
     background: transparent;
-    padding: 11px 12px;
+    padding: 0 16px 0 0;
     font-size: .95rem;
     color: var(--ap-text);
     outline: none;
     font-family: var(--ap-font);
     min-width: 0;
+    height: 100%;
 }
-.ap-input-wrap input::placeholder {
-    color: #bbb;
-}
+.ap-input-wrap input::placeholder { color: #bbbbc8; }
 
 /* Phone with prefix */
 .ap-phone-wrap .ap-phone-prefix {
-    padding: 0 10px 0 14px;
+    padding: 0 12px 0 18px;
     font-size: .9rem;
     font-weight: 600;
     color: var(--ap-text-muted);
     border-right: 1.5px solid var(--ap-border);
     white-space: nowrap;
-    line-height: 44px;
+    line-height: 52px;
+    flex-shrink: 0;
 }
-.ap-phone-wrap input {
-    padding-left: 10px;
-}
+.ap-phone-wrap input { padding-left: 12px; }
 
 /* Password toggle */
 .ap-toggle-pass {
     border: none;
     background: transparent;
     cursor: pointer;
-    padding: 0 12px;
+    padding: 0 16px 0 8px;
     color: var(--ap-text-muted);
     display: flex;
     align-items: center;
     transition: color var(--ap-transition);
+    flex-shrink: 0;
 }
-.ap-toggle-pass:hover { color: var(--ap-primary); }
+.ap-toggle-pass:hover { color: var(--ap-text); }
 .ap-eye { width: 18px; height: 18px; }
 
-/* ── Field row ────────────────────────────────────────────── */
-.ap-field-row {
+/* ── Remember me + Forgot Password row ───────────────────── */
+.ap-remember-forgot-row {
     display: flex;
-    justify-content: flex-end;
-    margin-top: -8px;
-    margin-bottom: 16px;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 4px 20px;
 }
-.ap-forgot-link {
-    font-size: .82rem;
-    color: var(--ap-primary);
+.ap-remember-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: .83rem;
+    color: var(--ap-text);
+}
+.ap-remember-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.ap-check-box {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border: 1.5px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--ap-transition), border-color var(--ap-transition);
+    position: relative;
+}
+.ap-remember-checkbox:checked ~ .ap-check-box {
+    background: var(--ap-primary);
+    border-color: var(--ap-primary);
+}
+.ap-remember-checkbox:checked ~ .ap-check-box::after {
+    content: '';
+    width: 4px;
+    height: 7px;
+    border: 2px solid #fff;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translateY(-1px);
+    display: block;
+}
+.ap-forgot-trigger {
+    font-size: .83rem;
+    color: var(--ap-text-muted);
     text-decoration: none;
+    font-weight: 500;
+    transition: color var(--ap-transition);
+    cursor: pointer;
 }
-.ap-forgot-link:hover { text-decoration: underline; }
+.ap-forgot-trigger:hover { color: var(--ap-primary); }
 
 /* ── Buttons ──────────────────────────────────────────────── */
 .ap-btn {
@@ -293,56 +344,99 @@
     justify-content: center;
     gap: 8px;
     width: 100%;
-    padding: 12px 20px;
+    height: 52px;
+    padding: 0 24px;
     border: none;
-    border-radius: var(--ap-radius);
-    font-size: .95rem;
+    border-radius: var(--ap-radius-pill);
+    font-size: .97rem;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    transition: background var(--ap-transition), transform var(--ap-transition), opacity var(--ap-transition);
+    transition: background var(--ap-transition), transform var(--ap-transition), opacity var(--ap-transition), box-shadow var(--ap-transition);
     font-family: var(--ap-font);
+    letter-spacing: .01em;
 }
 .ap-btn:active { transform: scale(.98); }
 .ap-btn:disabled {
-    opacity: .6;
+    opacity: .5;
     cursor: not-allowed;
     transform: none;
 }
 
 .ap-btn-primary {
-    background: var(--ap-primary);
+    background: var(--herlan-primary-color, #eb161e);
     color: #fff;
-    margin-top: 6px;
+    margin-top: 4px;
+    box-shadow: 0 4px 18px rgba(235,22,30,.22);
 }
 .ap-btn-primary:hover:not(:disabled) {
-    background: var(--ap-primary-dark);
+    background: color-mix(in srgb, var(--herlan-primary-color, #eb161e) 82%, #000);
+    box-shadow: 0 6px 22px rgba(235,22,30,.32);
 }
 
-.ap-btn-social {
-    background: #fff;
+.ap-btn-ghost {
+    background: transparent;
+    color: var(--ap-text-muted);
+    border: 1.5px dashed #ccc;
+    font-size: .88rem;
+    height: 48px;
+    margin-top: 4px;
+    box-shadow: none;
+}
+.ap-btn-ghost:hover:not(:disabled) {
+    background: #fafafa;
     color: var(--ap-text);
-    border: 1.5px solid var(--ap-border);
-    font-weight: 500;
-    margin-bottom: 10px;
-}
-.ap-btn-social:last-child { margin-bottom: 0; }
-.ap-btn-social:hover:not(:disabled) {
-    background: #f8f8f8;
-    border-color: #ccc;
+    border-color: #aaa;
 }
 
-.ap-btn-google  svg { flex-shrink: 0; }
-.ap-btn-facebook svg { flex-shrink: 0; }
+/* ── Loading spinner on button ────────────────────────────── */
+.ap-btn.ap-loading {
+    pointer-events: none;
+    opacity: .82;
+}
+.ap-btn.ap-loading::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: ap-spin .7s linear infinite;
+    flex-shrink: 0;
+}
+.ap-btn-ghost.ap-loading::before,
+.ap-btn-social.ap-loading::before {
+    border-color: rgba(0,0,0,.15);
+    border-top-color: var(--ap-text);
+}
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+
+/* ── Switch text ──────────────────────────────────────────── */
+.ap-switch-text {
+    text-align: center;
+    font-size: .855rem;
+    color: var(--ap-text-muted);
+    margin: 20px 0 6px;
+}
+.ap-switch-link {
+    color: var(--ap-primary);
+    font-weight: 700;
+    text-decoration: none;
+    transition: color var(--ap-transition);
+}
+.ap-switch-link:hover { color: var(--ap-primary-dark); }
 
 /* ── Divider ──────────────────────────────────────────────── */
 .ap-divider {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 20px 0 16px;
+    margin: 18px 0 16px;
     color: var(--ap-text-muted);
-    font-size: .8rem;
+    font-size: .77rem;
+    letter-spacing: .03em;
+    text-transform: none;
 }
 .ap-divider::before,
 .ap-divider::after {
@@ -352,29 +446,68 @@
     background: var(--ap-border);
 }
 
-/* ── OTP ──────────────────────────────────────────────────── */
+/* ── Social circles ───────────────────────────────────────── */
+.ap-social-circles {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 4px;
+}
+.ap-social-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ap-border);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: box-shadow var(--ap-transition), transform var(--ap-transition), border-color var(--ap-transition);
+    box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    padding: 0;
+}
+.ap-social-circle:hover:not(:disabled) {
+    box-shadow: 0 4px 16px rgba(0,0,0,.13);
+    transform: translateY(-1px);
+    border-color: #d0d2d8;
+}
+.ap-social-circle:active:not(:disabled) {
+    transform: scale(.95);
+}
+.ap-social-circle:disabled {
+    opacity: .42;
+    cursor: not-allowed;
+}
+
+/* Hide legacy full-width social buttons (replaced by circles) */
+.ap-btn-social,
+.ap-social-btns { display: none !important; }
+
+/* ── OTP digits ───────────────────────────────────────────── */
 .ap-otp-hint {
     font-size: .875rem;
     color: var(--ap-text-muted);
-    margin: 0 0 14px;
+    margin: 0 0 16px;
     line-height: 1.5;
+    text-align: center;
 }
 .ap-otp-inputs {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 .ap-otp-digit {
     width: 46px;
     height: 52px;
     border: 1.5px solid var(--ap-border);
-    border-radius: 8px;
+    border-radius: 14px;
     text-align: center;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--ap-text);
-    background: #fafafa;
+    background: var(--ap-input-bg);
     outline: none;
     transition: border-color var(--ap-transition), box-shadow var(--ap-transition), background var(--ap-transition);
     font-family: var(--ap-font);
@@ -384,7 +517,7 @@
 .ap-otp-digit:focus {
     border-color: var(--ap-primary);
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(248,86,6,.12);
+    box-shadow: 0 0 0 3px rgba(59,191,114,.13);
 }
 .ap-otp-digit.ap-filled {
     border-color: var(--ap-primary);
@@ -398,133 +531,78 @@
     gap: 8px;
     font-size: .82rem;
     color: var(--ap-text-muted);
-    margin: 8px 0 14px;
-    height: 24px;
+    margin: 10px 0 14px;
+    min-height: 24px;
 }
 .ap-timer-text { font-weight: 600; }
 
-/* ── OTP steps ────────────────────────────────────────────── */
+/* ── OTP / Register steps ─────────────────────────────────── */
 .ap-otp-step,
-.ap-reg-step {
-    display: none;
-}
+.ap-reg-step { display: none; }
 .ap-otp-step.active,
-.ap-reg-step.active {
-    display: block;
-}
+.ap-reg-step.active { display: block; }
 
-/* ── Links / back ─────────────────────────────────────────── */
+/* ── Link / Back btn ──────────────────────────────────────── */
 .ap-link {
     display: block;
     text-align: center;
-    font-size: .82rem;
+    font-size: .83rem;
     color: var(--ap-primary);
     background: none;
     border: none;
     cursor: pointer;
-    padding: 6px 0 0;
+    padding: 8px 0 0;
     font-family: var(--ap-font);
     text-decoration: none;
     transition: color var(--ap-transition);
 }
 .ap-link:hover { color: var(--ap-primary-dark); }
+.ap-back-btn { margin-top: 8px; }
 
-.ap-back-btn { margin-top: 10px; }
+/* ── Forgot link (legacy, now replaced by ap-forgot-trigger) ─ */
+.ap-forgot-link {
+    font-size: .82rem;
+    color: var(--ap-text-muted);
+    text-decoration: none;
+}
+.ap-forgot-link:hover { color: var(--ap-primary); }
 
 /* ── Phone check message ──────────────────────────────────── */
 .ap-phone-check-msg {
     display: block;
     font-size: .78rem;
-    margin-top: 5px;
-    min-height: 18px;
+    margin-top: 6px;
+    /*min-height: 18px;*/
+    padding-left: 18px;
     transition: color var(--ap-transition);
 }
-.ap-phone-check-msg.taken  { color: #e74c3c; }
-.ap-phone-check-msg.free   { color: #27ae60; }
-
-/* ── Guest button (checkout only) ────────────────────────── */
-.ap-btn-ghost {
-    background: transparent;
-    color: var(--ap-text-muted);
-    border: 1px dashed #ccc;
-    font-size: .85rem;
-    width: 100%;
-    margin-top: 4px;
-}
-.ap-btn-ghost:hover {
-    background: #f9f9f9;
-    color: var(--ap-text);
-    border-color: #aaa;
-}
+.ap-phone-check-msg.taken { color: #e74c3c; }
+.ap-phone-check-msg.free  { color: #27ae60; }
 
 /* ── Terms ────────────────────────────────────────────────── */
 .ap-terms {
-    margin: 18px 0 0;
-    font-size: .76rem;
-    color: var(--ap-text-muted);
+    margin: 22px 0 0;
+    font-size: .74rem;
+    color: #bbbbc8;
     text-align: center;
     line-height: 1.6;
 }
 .ap-terms a { color: var(--ap-primary); text-decoration: none; }
 .ap-terms a:hover { text-decoration: underline; }
 
-/* ── Loading spinner on button ────────────────────────────── */
-.ap-btn.ap-loading {
-    pointer-events: none;
-    opacity: .8;
-}
-.ap-btn.ap-loading::before {
-    content: '';
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(255,255,255,.4);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: ap-spin .7s linear infinite;
-    margin-right: 8px;
-}
-.ap-btn-social.ap-loading::before {
-    border-color: rgba(0,0,0,.15);
-    border-top-color: var(--ap-text);
-}
-
-@keyframes ap-spin {
-    to { transform: rotate(360deg); }
-}
-
 /* ── Scrollbar ────────────────────────────────────────────── */
 .ap-dialog::-webkit-scrollbar { width: 4px; }
 .ap-dialog::-webkit-scrollbar-track { background: transparent; }
 .ap-dialog::-webkit-scrollbar-thumb { background: var(--ap-border); border-radius: 4px; }
 
-/* ── Social buttons area ──────────────────────────────────── */
-.ap-social-btns { display: flex; flex-direction: column; }
-
-/* ── Responsive ───────────────────────────────────────────── */
-/* ── Select input ─────────────────────────────────────────── */
+/* ── Select & Date ────────────────────────────────────────── */
 .ap-input-wrap .ap-select {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 11px 12px;
-    font-size: .95rem;
-    color: var(--ap-text);
-    outline: none;
-    font-family: var(--ap-font);
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
 }
 .ap-date-input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 11px 12px;
-    font-size: .95rem;
-    color: var(--ap-text);
-    outline: none;
-    font-family: var(--ap-font);
+    /* inherits from .ap-input-wrap input */
 }
 
 /* ── Two-column field row ─────────────────────────────────── */
@@ -533,14 +611,10 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
-
-/* ── Required star ────────────────────────────────────────── */
 .ap-required { color: #e74c3c; }
 
-/* ── Loyalty Programme section ────────────────────────────── */
-.ap-loyalty-toggle {
-    margin: 14px 0 4px;
-}
+/* ── Loyalty section ──────────────────────────────────────── */
+.ap-loyalty-toggle { margin: 12px 0 4px; }
 .ap-loyalty-check-label {
     display: flex;
     align-items: center;
@@ -587,16 +661,12 @@
     color: var(--ap-text);
     line-height: 1.4;
 }
-
-.ap-loyalty-fields {
-    margin-top: 4px;
-    overflow: hidden;
-}
+.ap-loyalty-fields { margin-top: 4px; overflow: hidden; }
 .ap-loyalty-fields-inner {
-    background: linear-gradient(135deg, #fff8f5 0%, #fff3ee 100%);
-    border: 1.5px solid rgba(248,86,6,.2);
-    border-radius: 10px;
-    padding: 14px 14px 10px;
+    background: linear-gradient(135deg, #f4fdf8 0%, #edf9f3 100%);
+    border: 1.5px solid rgba(59,191,114,.2);
+    border-radius: 14px;
+    padding: 14px;
     margin-bottom: 4px;
 }
 .ap-loyalty-desc {
@@ -605,37 +675,54 @@
     font-weight: 500;
     margin: 0 0 12px;
 }
-.ap-loyalty-fields .ap-field {
-    margin-bottom: 12px;
-}
-.ap-loyalty-fields .ap-field:last-child {
-    margin-bottom: 0;
-}
+.ap-loyalty-fields .ap-field { margin-bottom: 12px; }
+.ap-loyalty-fields .ap-field:last-child { margin-bottom: 0; }
 
+/* ── Guest button area ────────────────────────────────────── */
+.ap-guest-wrap { margin: 8px 0 4px; }
+
+/* ── Mobile: Bottom Sheet ─────────────────────────────────── */
 @media (max-width: 480px) {
     .ap-dialog {
-        padding: 24px 20px 20px;
-        border-radius: 16px 16px 0 0;
+        padding: 22px 22px 36px;
+        border-radius: 28px 28px 0 0;
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
         width: 100%;
         max-width: 100%;
-        max-height: 92vh;
-        animation: ap-slide-up-mobile var(--ap-transition) forwards;
+        max-height: 95vh;
+        animation: ap-slide-up-mobile .32s cubic-bezier(.25,.46,.45,.94) forwards;
     }
     @keyframes ap-slide-up-mobile {
         from { transform: translateY(100%); }
         to   { transform: translateY(0); }
     }
-    .ap-otp-digit { width: 40px; height: 46px; font-size: 1.1rem; gap: 6px; }
-    .ap-otp-inputs { gap: 6px; }
+
+    .ap-panel-header { padding-top: 26px; margin-bottom: 20px; }
+    .ap-title { font-size: 1.6rem; }
+    .ap-subtitle { font-size: .84rem; }
+
+    .ap-input-wrap { height: 52px; }
+    .ap-btn { height: 50px; font-size: .95rem; }
+
+    .ap-otp-digit { width: 40px; height: 48px; font-size: 1.1rem; }
+    .ap-otp-inputs { gap: 7px; }
+
+    .ap-social-circle { width: 48px; height: 48px; }
+
+    .ap-header-back {
+        top: 18px;
+        left: 18px;
+        width: 34px;
+        height: 34px;
+    }
 }
 
-.ap-input-wrap .ap-icon {margin-right: 7px;}
-
-/* ── My Account nav drawer (mobile only) ─────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   My Account nav drawer (mobile only)
+═══════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
     .woocommerce-MyAccount-navigation {
         position: fixed !important;
@@ -659,7 +746,6 @@
         transform: translateX(0) !important;
     }
 
-    /* ── Drawer header ── */
     .ap-nav-header {
         display: flex;
         align-items: center;
@@ -692,7 +778,6 @@
     }
     .ap-nav-close:hover { background: #f5f5f5; color: #111; }
 
-    /* ── Menu list ── */
     .woocommerce-MyAccount-navigation ul {
         list-style: none;
         margin: 0;
@@ -719,8 +804,6 @@
         background: #fafafa;
         color: #111;
     }
-
-    /* ── Active item ── */
     .woocommerce-MyAccount-navigation ul li.is-active {
         border-left: 3px solid #e53e3e !important;
         padding-left: 0 !important;
@@ -735,7 +818,6 @@
         padding-left: 15px !important;
     }
 
-    /* ── Overlay ── */
     .ap-nav-overlay {
         position: fixed;
         inset: 0;
@@ -750,25 +832,19 @@
         pointer-events: auto;
     }
 }
-@media (max-width: 768px) {
-    .herlan-history-popup:not(.open) {
-        pointer-events: none;
-    }
-    .herlan-history-popup.open {
-        pointer-events: auto;
-    }
 
-    /* Fix: loyalty CSS hides nav on my-points page — show it when drawer opens */
+@media (max-width: 768px) {
+    .herlan-history-popup:not(.open) { pointer-events: none; }
+    .herlan-history-popup.open       { pointer-events: auto; }
+
     body.woocommerce-my-points .woocommerce-MyAccount-navigation.ap-nav-open {
         display: flex !important;
     }
 }
 
-/* ── Checkout — two-column desktop layout ─────────────────────
-   Shoptimizer floats #order_review_heading + #order_review right at 41.17%.
-   Our template moves #payment outside #order_review, so we must also float
-   it right (with clear:right) so it sits below the order table in that column.
-   ────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   Checkout — two-column desktop layout
+═══════════════════════════════════════════════════════════════ */
 @media (min-width: 993px) {
     #payment {
         float: right;
@@ -778,11 +854,9 @@
     }
 }
 
-/* ── Checkout — mobile flex order ────────────────────────────
-   DOM order after template rewrite: #customer_details → h3#order_review_heading
-   → #order_review → #payment.  On mobile we restore the original visual flow:
-   Your order → order table → shipping form → payment.
-   ────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   Checkout — mobile flex order
+═══════════════════════════════════════════════════════════════ */
 @media (max-width: 992px) {
     form.woocommerce-checkout {
         display: flex;
@@ -793,3 +867,13 @@
     form.woocommerce-checkout > #customer_details                { order: 3; }
     form.woocommerce-checkout > #payment                         { order: 4; }
 }
+
+#ap-panel-register input {
+    border: 0px !important;
+    box-shadow: 0px 0px !important;
+}
+#ap-panel-login input {
+    border: 0px !important;
+    box-shadow: 0px 0px !important;
+}
+.ap-panel-header {text-align: center}
