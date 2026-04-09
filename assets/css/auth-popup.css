@@ -12,7 +12,7 @@
     --ap-border:        #e8eaed;
     --ap-bg:            #ffffff;
     --ap-input-bg:      #f3f5f7;
-    --ap-radius-pill:   28px;
+    --ap-radius-pill:   10px;
     --ap-radius-dialog: 24px;
     --ap-shadow:        0 24px 64px rgba(0,0,0,.17);
     --ap-transition:    .22s cubic-bezier(.4,0,.2,1);
@@ -113,7 +113,8 @@
     height: 36px;
     border: 1.5px solid var(--ap-border);
     background: var(--ap-bg);
-    border-radius: 10px;
+    /*border-radius: 10px;*/
+    border-radius: var(--ap-border-pill);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -481,7 +482,8 @@
 .ap-social-circle {
     width: 50px;
     height: 50px;
-    border-radius: 50%;
+    /*border-radius: 50%;*/
+    border-radius: var(--ap-radius-pill);
     border: 1.5px solid var(--ap-border);
     background: #fff;
     display: flex;
@@ -881,6 +883,183 @@
     background: var(--ap-input-bg);
     outline: none;
     font-family: var(--ap-font);
+}
+
+/* ── Mobile Account Drawer & Content Modal ───────────────── */
+/* Hidden on desktop — JS also guards with isMobile() check  */
+#ap-acct-drawer,
+#ap-acct-modal { display: none; }
+
+@media (max-width: 768px) {
+
+    /* ── Nav Drawer ─────────────────────────────────────────── */
+    #ap-acct-drawer {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 999980;
+        pointer-events: none;
+    }
+    #ap-acct-drawer.open { pointer-events: auto; }
+
+    .ap-acct-drawer-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.52);
+        opacity: 0;
+        transition: opacity .3s ease;
+    }
+    #ap-acct-drawer.open .ap-acct-drawer-overlay { opacity: 1; }
+
+    .ap-acct-drawer-panel {
+        position: absolute;
+        top: 0; left: 0;
+        width: 82%;
+        max-width: 300px;
+        height: 100%;
+        background: #fff;
+        transform: translateX(-100%);
+        transition: transform .3s cubic-bezier(.4,0,.2,1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 4px 0 24px rgba(0,0,0,.14);
+    }
+    #ap-acct-drawer.open .ap-acct-drawer-panel { transform: translateX(0); }
+
+    .ap-acct-drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 16px;
+        border-bottom: 1px solid var(--ap-border);
+        flex-shrink: 0;
+    }
+    .ap-acct-drawer-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ap-text);
+        font-family: var(--ap-font);
+    }
+    .ap-acct-drawer-close {
+        width: 30px; height: 30px;
+        border: none; background: none;
+        cursor: pointer;
+        color: var(--ap-text-muted);
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        transition: background .15s;
+        padding: 0;
+    }
+    .ap-acct-drawer-close:hover { background: var(--ap-input-bg); color: var(--ap-text); }
+
+    .ap-acct-drawer-nav {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0 80px;
+    }
+    .ap-acct-drawer-nav ul { list-style: none; margin: 0; padding: 0; }
+    .ap-acct-drawer-nav ul li {
+        margin: 0;
+        border-bottom: 1px solid #f5f5f5;
+    }
+    .ap-acct-drawer-nav ul li a {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        text-decoration: none;
+        transition: background .15s, color .15s;
+        font-family: var(--ap-font);
+    }
+    .ap-acct-drawer-nav ul li a:hover { background: #fafafa; color: var(--herlan-primary-color, #eb161e); }
+    .ap-acct-drawer-nav ul li.is-active { border-left: 3px solid var(--herlan-primary-color, #eb161e); }
+    .ap-acct-drawer-nav ul li.is-active a { color: var(--herlan-primary-color, #eb161e); font-weight: 700; }
+
+    /* ── Content Modal ──────────────────────────────────────── */
+    #ap-acct-modal {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        inset: 0;
+        z-index: 999985;
+        background: #f5f6f8;
+        transform: translateX(100%);
+        transition: transform .32s cubic-bezier(.4,0,.2,1);
+    }
+    #ap-acct-modal.open { transform: translateX(0); }
+
+    .ap-acct-modal-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        background: #fff;
+        border-bottom: 1px solid var(--ap-border);
+        flex-shrink: 0;
+    }
+    .ap-acct-modal-back {
+        width: 32px; height: 32px;
+        border: 1.5px solid var(--ap-border);
+        background: #fff;
+        border-radius: 9px;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--ap-text);
+        padding: 0; flex-shrink: 0;
+        transition: background .15s;
+    }
+    .ap-acct-modal-back:hover { background: var(--ap-input-bg); }
+    .ap-acct-modal-title {
+        flex: 1;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ap-text);
+        font-family: var(--ap-font);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .ap-acct-modal-close {
+        width: 30px; height: 30px;
+        border: none; background: none;
+        cursor: pointer;
+        color: var(--ap-text-muted);
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px;
+        transition: background .15s;
+        padding: 0; flex-shrink: 0;
+    }
+    .ap-acct-modal-close:hover { background: var(--ap-input-bg); color: var(--ap-text); }
+
+    .ap-acct-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+    .ap-acct-spinner-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px 0;
+    }
+    .ap-acct-spinner {
+        display: inline-block;
+        width: 22px; height: 22px;
+        border: 3px solid var(--ap-border);
+        border-top-color: var(--herlan-primary-color, #eb161e);
+        border-radius: 50%;
+        animation: ap-spin .7s linear infinite;
+    }
+    .ap-acct-error {
+        text-align: center;
+        color: var(--ap-text-muted);
+        font-size: .875rem;
+        padding: 32px 16px;
+        font-family: var(--ap-font);
+    }
 }
 
 /* ── Loyalty Rules Table ──────────────────────────────────── */
