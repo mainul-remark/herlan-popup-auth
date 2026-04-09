@@ -8,11 +8,6 @@ class Auth_Popup_Public_Frontend {
         add_action( 'wp_footer',          [ __CLASS__, 'render_popup'   ] );
         add_shortcode( 'auth_popup_button', [ __CLASS__, 'shortcode_button' ] );
 
-        // Re-add WooCommerce account navigation on mobile sub-pages.
-        // The herlan-theme removes it on all account sub-pages (orders, my-points, etc.)
-        // so auth-popup's nav drawer has nothing to slide in. Running at priority 100
-        // ensures this runs after the theme's priority-10 removal.
-        add_action( 'wp', [ __CLASS__, 'restore_mobile_account_navigation' ], 100 );
 
         // Pre-fill WooCommerce checkout shipping fields from user's default address
         add_filter( 'woocommerce_checkout_get_value', [ __CLASS__, 'prefill_checkout_shipping' ], 10, 2 );
@@ -24,24 +19,6 @@ class Auth_Popup_Public_Frontend {
         if ( Auth_Popup_Core::get_setting( 'checkout_disable_ship_to_different', '1' ) === '1' ) {
             add_filter( 'woocommerce_cart_needs_shipping_address', '__return_false' );
             add_filter( 'woocommerce_ship_to_different_address_checked', '__return_false' );
-        }
-    }
-
-    /**
-     * Re-add the WooCommerce account navigation on mobile account sub-pages.
-     *
-     * The herlan-theme removes `woocommerce_account_navigation` on mobile when
-     * visiting any account sub-page (orders, my-points, etc.), leaving the DOM
-     * without a `.woocommerce-MyAccount-navigation` element. Auth-popup's nav
-     * drawer needs that element to exist so it can slide it in. Running at
-     * priority 100 guarantees we run after the theme's priority-10 removal.
-     */
-    public static function restore_mobile_account_navigation(): void {
-        if ( ! wp_is_mobile() || ! is_user_logged_in() || ! is_account_page() ) {
-            return;
-        }
-        if ( ! has_action( 'woocommerce_account_navigation', 'woocommerce_account_navigation' ) ) {
-            add_action( 'woocommerce_account_navigation', 'woocommerce_account_navigation' );
         }
     }
 
@@ -67,10 +44,12 @@ class Auth_Popup_Public_Frontend {
         }
 
         // Main JS
+        wp_enqueue_script( 'jquery-ui-datepicker' );
+
         wp_enqueue_script(
             'auth-popup',
             AUTH_POPUP_URL . 'assets/js/auth-popup.js',
-            [ 'jquery' ],
+            [ 'jquery', 'jquery-ui-datepicker' ],
             AUTH_POPUP_VERSION,
             true
         );
@@ -122,7 +101,6 @@ class Auth_Popup_Public_Frontend {
             'enableOtp'       => $s['enable_otp_login'],
             'isLoggedIn'      => is_user_logged_in() ? '1' : '0',
             'displayName'     => is_user_logged_in() ? wp_get_current_user()->display_name : '',
-            'isAccountPage'   => ( function_exists( 'wc_get_page_id' ) && self::is_myaccount_url() ) ? '1' : '0',
             'loyaltyNonce'    => wp_create_nonce( 'herlan_loyalty_nonce' ),
             'myAccountUrl'    => function_exists( 'wc_get_page_permalink' )
                                     ? wc_get_page_permalink( 'myaccount' )
@@ -211,20 +189,6 @@ class Auth_Popup_Public_Frontend {
         }
 
         return $value;
-    }
-
-    /**
-     * Returns true when the current request URL begins with the my-account
-     * page URL — covers the dashboard AND all sub-pages/custom plugin endpoints.
-     */
-    private static function is_myaccount_url(): bool {
-        $page_id = wc_get_page_id( 'myaccount' );
-        if ( ! $page_id ) return false;
-        $base = trailingslashit( get_permalink( $page_id ) );
-        $current = ( is_ssl() ? 'https' : 'http' )
-                 . '://' . $_SERVER['HTTP_HOST']
-                 . strtok( $_SERVER['REQUEST_URI'], '?' );
-        return strpos( trailingslashit( $current ), $base ) === 0;
     }
 
     public static function shortcode_button( array $atts ): string {

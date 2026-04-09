@@ -283,7 +283,35 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                     </div>
                     <div class="ap-loyalty-fields" id="ap-loyalty-benefits">
                         <div class="ap-loyalty-fields-inner">
-                            <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Ad animi, aperiam cumque distinctio doloribus ea earum eius error laudantium, magnam necessitatibus non officiis placeat quibusdam saepe sint suscipit ullam vero!</p>
+<!--                            <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Ad animi, aperiam cumque distinctio doloribus ea earum eius error laudantium, magnam necessitatibus non officiis placeat quibusdam saepe sint suscipit ullam vero!</p>-->
+                            <div class="ap-loyalty-rules-wrap">
+                                <h3 class="ap-loyalty-rules-title"><?php esc_html_e( 'Herlan Star Member Rules', 'auth-popup' ); ?></h3>
+                                <div class="ap-loyalty-table-scroll">
+                                    <table id="auth-loyal-rules-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="ap-col-num">#</th>
+                                                <th><?php esc_html_e( 'Name', 'auth-popup' ); ?></th>
+                                                <th><?php esc_html_e( 'Description', 'auth-popup' ); ?></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ap-loyalty-rules-tbody">
+                                            <tr class="ap-rule-loading-row">
+                                                <td colspan="3">
+                                                    <span class="ap-rule-spinner"></span>
+                                                    <?php esc_html_e( 'Loading rules…', 'auth-popup' ); ?>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="ap-loyalty-rules-footer" style="display:none;">
+                                    <button type="button" id="ap-loyalty-view-more">
+                                        <?php esc_html_e( 'View More', 'auth-popup' ); ?>
+                                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="ap-loyalty-fields" id="ap-loyalty-fields" style="display:none;">
@@ -291,6 +319,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                             <p class="ap-loyalty-desc"><?php esc_html_e( 'Complete your loyalty profile to start earning points!', 'auth-popup' ); ?></p>
                             <div class="ap-field-row-1">
                                 <div class="ap-field">
+                                    <label for="ap-reg-gender"><?php esc_html_e( 'Gender', 'auth-popup' ); ?> <span class="ap-required">*</span></label>
                                     <div class="ap-input-wrap">
                                         <svg class="ap-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M16 21v-1a4 4 0 00-8 0v1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                         <select name="gender" id="ap-reg-gender" class="ap-select">
@@ -301,12 +330,13 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                                         </select>
                                     </div>
                                 </div>
-                                <br>
                                 <div class="ap-field">
+                                    <label for="ap-reg-dob"><?php esc_html_e( 'Date of Birth', 'auth-popup' ); ?> <span class="ap-required">*</span></label>
                                     <div class="ap-input-wrap">
                                         <svg class="ap-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                        <input type="date" name="dob" id="ap-reg-dob" class="ap-date-input"
-                                               max="<?php echo esc_attr( date('Y-m-d', strtotime('-10 years')) ); ?>">
+                                        <input type="text" name="dob" id="ap-reg-dob" class="ap-date-input ap-datepicker"
+                                               placeholder="<?php esc_attr_e( 'Select date of birth', 'auth-popup' ); ?>"
+                                               readonly>
                                     </div>
                                 </div>
                             </div>

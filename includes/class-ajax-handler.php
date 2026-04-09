@@ -17,6 +17,7 @@ class Auth_Popup_Ajax_Handler {
             'auth_popup_facebook_auth',
             'auth_popup_logout',
             'auth_popup_check_phone',
+            'auth_popup_get_loyalty_rules',
         ];
 
         foreach ( $actions as $action ) {
@@ -338,6 +339,45 @@ class Auth_Popup_Ajax_Handler {
         self::verify_nonce();
         wp_logout();
         self::success( [ 'redirect' => home_url() ] );
+    }
+
+    /* ── Loyalty Rules ──────────────────────────────────────────────── */
+
+    public static function auth_popup_get_loyalty_rules(): void {
+        self::verify_nonce();
+
+        $cache_key = 'auth_popup_loyalty_rules';
+        $cached    = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            self::success( $cached );
+        }
+
+        $response = wp_remote_get( 'https://loyalty.herlan.store/api/customer/loyalty/rules', [
+            'timeout' => 10,
+            'headers' => [ 'Accept' => 'application/json' ],
+        ] );
+
+        if ( is_wp_error( $response ) ) {
+            self::error( __( 'Failed to load loyalty rules.', 'auth-popup' ) );
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( empty( $body['data'] ) || ! is_array( $body['data'] ) ) {
+            self::error( __( 'No loyalty rules available.', 'auth-popup' ) );
+        }
+
+        $rules = array_values( array_map( function ( $rule ) {
+            return [
+                'name'        => sanitize_text_field( $rule['name']        ?? '' ),
+                'description' => sanitize_text_field( $rule['short_description'] ?? '' ),
+            ];
+        }, $body['data'] ) );
+
+        $payload = [ 'rules' => $rules ];
+        set_transient( $cache_key, $payload, 5 * MINUTE_IN_SECONDS );
+
+        self::success( $payload );
     }
 
     /* ── Check Phone (for registration) ─────────────────────────────── */

@@ -745,127 +745,6 @@
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   My Account nav drawer (mobile only)
-═══════════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
-    .woocommerce-MyAccount-navigation {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        height: 100% !important;
-        width: 80%;
-        max-width: 300px;
-        background: #fff;
-        z-index: 999980;
-        box-shadow: 6px 0 32px rgba(0,0,0,.18);
-        transform: translateX(-100%) !important;
-        transition: transform .3s cubic-bezier(.4,0,.2,1);
-        overflow-y: auto;
-        display: flex !important;
-        flex-direction: column;
-        float: none !important;
-        margin: 0 !important;
-    }
-    .woocommerce-MyAccount-navigation.ap-nav-open {
-        transform: translateX(0) !important;
-    }
-
-    .ap-nav-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 18px 20px;
-        border-bottom: 1px solid #f0f0f0;
-        flex-shrink: 0;
-    }
-    .ap-nav-header__title {
-        font-size: 16px;
-        font-weight: 700;
-        color: #111;
-        letter-spacing: 0.01em;
-        margin: 0;
-    }
-    .ap-nav-close {
-        background: none;
-        border: none;
-        padding: 4px;
-        cursor: pointer;
-        color: #888;
-        line-height: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        transition: background .15s, color .15s;
-    }
-    .ap-nav-close:hover { background: #f5f5f5; color: #111; }
-
-    .woocommerce-MyAccount-navigation ul {
-        list-style: none;
-        margin: 0;
-        padding: 10px 0 80px;
-        flex: 1;
-    }
-    .woocommerce-MyAccount-navigation ul li {
-        margin: 0;
-        border-bottom: 1px solid #f5f5f5;
-        float: none !important;
-    }
-    .woocommerce-MyAccount-navigation ul li a {
-        display: flex;
-        align-items: center;
-        padding: 14px 15px !important;
-        font-size: 14.5px;
-        font-weight: 500;
-        color: #333;
-        text-decoration: none;
-        border-radius: 6px;
-        transition: background .15s, color .15s;
-    }
-    .woocommerce-MyAccount-navigation ul li a:hover {
-        background: #fafafa;
-        color: #111;
-    }
-    .woocommerce-MyAccount-navigation ul li.is-active {
-        border-left: 3px solid #e53e3e !important;
-        padding-left: 0 !important;
-        background: #fff5f5;
-        background-clip: content-box;
-    }
-    .woocommerce-MyAccount-navigation ul li.is-active a {
-        color: #e53e3e !important;
-        background: transparent;
-        font-weight: 700;
-        border-left: none;
-        padding-left: 15px !important;
-    }
-
-    .ap-nav-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 999979;
-        background: rgba(0,0,0,.5);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .3s ease;
-    }
-    .ap-nav-overlay.ap-nav-open {
-        opacity: 1;
-        pointer-events: auto;
-    }
-}
-
-@media (max-width: 768px) {
-    .herlan-history-popup:not(.open) { pointer-events: none; }
-    .herlan-history-popup.open       { pointer-events: auto; }
-
-    body.woocommerce-my-points .woocommerce-MyAccount-navigation.ap-nav-open {
-        display: flex !important;
-    }
-}
 
 /* ═══════════════════════════════════════════════════════════════
    Checkout — two-column desktop layout
@@ -891,6 +770,221 @@
     form.woocommerce-checkout > .woocommerce-checkout-review-order { order: 2; }
     form.woocommerce-checkout > #customer_details                { order: 3; }
     form.woocommerce-checkout > #payment                         { order: 4; }
+}
+
+/* ── jQuery UI Datepicker ─────────────────────────────────── */
+.ui-datepicker {
+    background: #fff;
+    border: 1.5px solid var(--ap-border);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.14);
+    padding: 12px;
+    font-family: var(--ap-font);
+    font-size: .82rem;
+    z-index: 9999999 !important;
+    width: 256px;
+}
+.ui-datepicker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 2px 0 6px;
+    border-bottom: 1px solid var(--ap-border);
+    position: relative;
+}
+.ui-datepicker-title {
+    font-weight: 700;
+    font-size: .85rem;
+    color: var(--ap-text);
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin: 0 auto;
+}
+.ui-datepicker-prev,
+.ui-datepicker-next {
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ap-border);
+    background: transparent;
+    position: static;
+    top: auto;
+    transition: background .15s;
+    flex-shrink: 0;
+}
+.ui-datepicker-prev:hover,
+.ui-datepicker-next:hover { background: var(--ap-input-bg); }
+.ui-datepicker-prev span,
+.ui-datepicker-next span  { display: none; }
+.ui-datepicker-prev::before { content: '‹'; font-size: 1rem; color: var(--ap-text); line-height: 1; }
+.ui-datepicker-next::before { content: '›'; font-size: 1rem; color: var(--ap-text); line-height: 1; }
+.ui-datepicker-calendar {
+    width: 100%;
+    border-collapse: collapse;
+}
+.ui-datepicker-calendar th {
+    font-size: .7rem;
+    font-weight: 600;
+    color: var(--ap-text-muted);
+    text-align: center;
+    padding: 4px 2px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.ui-datepicker-calendar td { padding: 2px; text-align: center; }
+.ui-datepicker-calendar td a,
+.ui-datepicker-calendar td span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    margin: 0 auto;
+    font-size: .8rem;
+    color: var(--ap-text);
+    text-decoration: none;
+    transition: background .15s;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+.ui-datepicker-calendar td a:hover { background: var(--ap-input-bg); }
+.ui-datepicker-calendar .ui-state-active,
+.ui-datepicker-calendar .ui-state-active:hover {
+    background: var(--herlan-primary-color, #eb161e) !important;
+    color: #fff !important;
+}
+.ui-datepicker-calendar .ui-datepicker-today a {
+    background: var(--ap-primary-light);
+    color: var(--ap-primary);
+    font-weight: 700;
+}
+.ui-datepicker-calendar .ui-datepicker-unselectable span {
+    color: var(--ap-text-muted);
+    opacity: .38;
+    cursor: default;
+}
+.ui-datepicker select.ui-datepicker-month,
+.ui-datepicker select.ui-datepicker-year {
+    border: 1px solid var(--ap-border);
+    border-radius: 6px;
+    padding: 2px 4px;
+    font-size: .78rem;
+    color: var(--ap-text);
+    background: var(--ap-input-bg);
+    outline: none;
+    font-family: var(--ap-font);
+}
+
+/* ── Loyalty Rules Table ──────────────────────────────────── */
+.ap-loyalty-rules-wrap {
+    margin-top: 4px;
+}
+.ap-loyalty-rules-title {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--ap-text);
+    margin: 0 0 10px;
+    letter-spacing: .01em;
+}
+.ap-loyalty-table-scroll {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--ap-border);
+}
+#auth-loyal-rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+    font-family: var(--ap-font);
+}
+#auth-loyal-rules-table thead tr {
+    /*background: var(--herlan-primary-color, #eb161e);*/
+}
+#auth-loyal-rules-table thead th {
+    padding: 9px 12px;
+    /*color: #fff;*/
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    letter-spacing: .02em;
+}
+#auth-loyal-rules-table thead th.ap-col-num,
+#auth-loyal-rules-table tbody td.ap-col-num {
+    width: 32px;
+    text-align: center;
+}
+#auth-loyal-rules-table tbody tr {
+    border-bottom: 1px solid var(--ap-border);
+    transition: background .15s;
+}
+#auth-loyal-rules-table tbody tr:last-child {
+    border-bottom: none;
+}
+#auth-loyal-rules-table tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+#auth-loyal-rules-table tbody tr:hover {
+    background: var(--ap-primary-light);
+}
+#auth-loyal-rules-table tbody td {
+    padding: 9px 12px;
+    color: var(--ap-text);
+    vertical-align: top;
+    line-height: 1.45;
+}
+.ap-rule-hidden { display: none; }
+
+/* Loading row */
+.ap-rule-loading-row td,
+.ap-rule-empty {
+    text-align: center;
+    color: var(--ap-text-muted);
+    padding: 16px !important;
+    font-size: .8rem;
+}
+.ap-rule-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--ap-border);
+    border-top-color: var(--herlan-primary-color, #eb161e);
+    border-radius: 50%;
+    animation: ap-spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+/* View More button */
+#ap-loyalty-rules-footer {
+    text-align: center;
+    margin-top: 8px;
+}
+#ap-loyalty-view-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--herlan-primary-color, #eb161e);
+    background: none;
+    border: 1px solid var(--herlan-primary-color, #eb161e);
+    border-radius: 20px;
+    padding: 5px 16px;
+    cursor: pointer;
+    font-family: var(--ap-font);
+    transition: background var(--ap-transition), color var(--ap-transition);
+}
+#ap-loyalty-view-more:hover {
+    background: var(--herlan-primary-color, #eb161e);
+    color: #fff;
 }
 
 /*custom css codes start*/

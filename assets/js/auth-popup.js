@@ -39,6 +39,8 @@
             this.initGoogle();
             this.initFacebook();
             this.initCheckout();
+            this.loadLoyaltyRules();
+            this.initDatepicker();
         },
 
         /* ── Trigger / Open ────────────────────────────────────────── */
@@ -384,6 +386,7 @@
                     this.showAlert('error', this.i18n('Please enter the 6-digit OTP.'));
                     return;
                 }
+                if (!this.validateLoyaltyFields()) return;
                 this.submitForm($form, 'auth_popup_register');
             });
 
@@ -767,6 +770,77 @@
             });
         },
 
+        /* ── jQuery UI Datepicker ────────────────────────────────────── */
+        initDatepicker() {
+            if (typeof $.fn.datepicker === 'undefined') return;
+
+            const maxDate = new Date();
+            maxDate.setFullYear(maxDate.getFullYear() - 10);
+
+            $('#ap-reg-dob').datepicker({
+                dateFormat:  'yy-mm-dd',
+                maxDate:     maxDate,
+                changeMonth: true,
+                changeYear:  true,
+                yearRange:   '1940:' + (new Date().getFullYear() - 10),
+                showAnim:    'fadeIn',
+            });
+        },
+
+        /* ── Loyalty Rules table ─────────────────────────────────────── */
+        loadLoyaltyRules() {
+            const $tbody  = $('#ap-loyalty-rules-tbody');
+            const $footer = $('#ap-loyalty-rules-footer');
+            if (!$tbody.length) return;
+
+            $.ajax({
+                url:    AuthPopup.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action: 'auth_popup_get_loyalty_rules',
+                    nonce:  AuthPopup.nonce,
+                },
+                success: (res) => {
+                    if (!res.success || !res.data.rules || !res.data.rules.length) {
+                        $tbody.html('<tr><td colspan="3" class="ap-rule-empty">No rules found.</td></tr>');
+                        return;
+                    }
+                    const rules = res.data.rules;
+                    let html = '';
+                    rules.forEach((rule, i) => {
+                        const hidden = i >= 3 ? ' ap-rule-hidden' : '';
+                        html += '<tr class="ap-rule-row' + hidden + '">'
+                            + '<td class="ap-col-num">' + (i + 1) + '</td>'
+                            + '<td>' + $('<div>').text(rule.name).html() + '</td>'
+                            + '<td>' + $('<div>').text(rule.description).html() + '</td>'
+                            + '</tr>';
+                    });
+                    $tbody.html(html);
+                    if (rules.length > 3) $footer.show();
+                },
+                error: () => {
+                    $tbody.html('<tr><td colspan="3" class="ap-rule-empty">Failed to load rules.</td></tr>');
+                },
+            });
+
+            const viewMoreSvg = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            const viewLessSvg = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            this.$overlay.on('click', '#ap-loyalty-view-more', () => {
+                const $btn      = $('#ap-loyalty-view-more');
+                const expanded  = $btn.hasClass('ap-expanded');
+                if (expanded) {
+                    $tbody.find('.ap-rule-row').each((i, el) => {
+                        if (i >= 3) $(el).addClass('ap-rule-hidden');
+                    });
+                    $btn.removeClass('ap-expanded').html('View More ' + viewMoreSvg);
+                } else {
+                    $tbody.find('.ap-rule-hidden').removeClass('ap-rule-hidden');
+                    $btn.addClass('ap-expanded').html('View Less ' + viewLessSvg);
+                }
+            });
+        },
+
         /* ── i18n helper ────────────────────────────────────────────── */
         i18n(key) {
             if (AuthPopup.i18n[key]) return AuthPopup.i18n[key];
@@ -780,58 +854,6 @@
     // ── Boot ─────────────────────────────────────────────────────────
     $(document).ready(() => {
         AP.init();
-
-        // Replace "Account" label in mobile drawer: username when logged in, "Menu" when logged out
-        var $drawerLabels = $('.herlan_mobile_drawer_container ul li a p');
-        $drawerLabels.each(function () {
-            // if ( $(this).text().trim() === 'Account' ) {
-            //     $(this).text( 'Menu' );
-            // }
-        });
-
-        // ── My Account nav drawer (mobile only) ──────────────────────
-        // Use body.woocommerce-account (set by WooCommerce PHP on ALL account
-        // pages) as the gate — more reliable than checking DOM element existence.
-        var $body       = $('body');
-        var $navOverlay = $('<div class="ap-nav-overlay"></div>').appendTo($body);
-
-        function getNav() {
-            return $('.woocommerce-MyAccount-navigation');
-        }
-
-        function openNav() {
-            var $nav = getNav();
-            // Inject header lazily on first open if not already present
-            if ( $nav.length && ! $nav.find('.ap-nav-header').length ) {
-                $nav.prepend(
-                    '<div class="ap-nav-header">' +
-                        '<span class="ap-nav-header__title">My Account</span>' +
-                        '<button class="ap-nav-close" aria-label="Close menu">' +
-                            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
-                        '</button>' +
-                    '</div>'
-                );
-            }
-            $nav.addClass('ap-nav-open');
-            $navOverlay.addClass('ap-nav-open');
-            $body.addClass('ap-no-scroll');
-        }
-
-        function closeNav() {
-            getNav().removeClass('ap-nav-open');
-            $navOverlay.removeClass('ap-nav-open');
-            $body.removeClass('ap-no-scroll');
-        }
-
-        // Trigger — only intercept on account pages (value set by PHP)
-        $( document ).on( 'click', '.herlan_mobile_drawer_container ul li a[href*="my-account"]', function (e) {
-            if ( AuthPopup.isAccountPage !== '1' ) return;
-            e.preventDefault();
-            getNav().hasClass('ap-nav-open') ? closeNav() : openNav();
-        });
-
-        $navOverlay.on( 'click', closeNav );
-        $( document ).on( 'click', '.ap-nav-close', closeNav );
     });
 
     // Expose for external use
