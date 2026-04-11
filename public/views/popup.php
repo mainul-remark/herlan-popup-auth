@@ -69,7 +69,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                             <polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/>
                         </svg>
                         <input type="text" id="ap-lp-credential" name="credential"
-                               placeholder="<?php esc_attr_e( 'Email address', 'auth-popup' ); ?>"
+                               placeholder="<?php esc_attr_e( 'Mobile Or Email address', 'auth-popup' ); ?>"
                                autocomplete="username" required>
                     </div>
                 </div>

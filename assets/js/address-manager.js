@@ -1,11 +1,10 @@
 /**
  * Auth Popup — Address Manager
  *
- * Renders saved addresses inline on the checkout page:
- *   • Desktop → before the billing/shipping fields
- *   • Mobile  → before the #payment block
- *
- * A separate modal handles add/edit form only (no list in modal).
+ * Two modes:
+ *   1. Checkout  — inline address selector injected before order review
+ *   2. My Account (/my-account/edit-address/) — full address book with
+ *      create / edit / delete / set-default support
  */
 ( function ( $ ) {
     'use strict';
@@ -98,6 +97,7 @@
     var cachedAddresses  = [];
     var selectedId       = 0;
     var isCheckout       = cfg.isCheckout === '1';
+    var isMyAccount      = cfg.isMyAccount === '1';
 
     /* ── Boot ───────────────────────────────────────────────────────── */
     $( function () {
@@ -110,7 +110,125 @@
                 loadAddresses( true );
             } );
         }
+
+        if ( isMyAccount ) {
+            loadMyAccountAddresses();
+        }
     } );
+
+    /* ══════════════════════════════════════════════════════════════════
+       MY ACCOUNT ADDRESS BOOK
+    ══════════════════════════════════════════════════════════════════ */
+
+    function loadMyAccountAddresses() {
+        setMyAccountWrap( '<div class="aab-inline-loading">Loading addresses&hellip;</div>' );
+
+        $.post( cfg.ajaxUrl, { action: 'auth_popup_get_addresses', nonce: cfg.nonce } )
+            .done( function ( res ) {
+                if ( res.success ) {
+                    cachedAddresses = res.data.addresses || [];
+                    renderMyAccountList( cachedAddresses );
+                } else {
+                    setMyAccountWrap( '<div class="aab-inline-empty">Could not load addresses.</div>' );
+                }
+            } )
+            .fail( function () {
+                setMyAccountWrap( '<div class="aab-inline-empty">Network error. Please reload the page.</div>' );
+            } );
+    }
+
+    function setMyAccountWrap( html ) {
+        $( '#aab-my-account-addresses' ).html( html );
+    }
+
+    function renderMyAccountList( addresses ) {
+        var html = '<div class="aab-ma-header">'
+            + '<h2 class="aab-ma-title">' + esc( i18n.my_addresses || 'My Addresses' ) + '</h2>'
+            + '<button type="button" class="aab-ma-add-btn">+ ' + esc( i18n.add_new || 'Add New Address' ) + '</button>'
+            + '</div>';
+
+        if ( ! addresses.length ) {
+            html += '<div class="aab-inline-empty">' + esc( i18n.no_addresses || 'No saved addresses yet. Add your first address below.' ) + '</div>';
+        } else {
+            html += '<div class="aab-ma-grid">'
+                + addresses.map( renderMyAccountCard ).join( '' )
+                + '</div>';
+        }
+
+        setMyAccountWrap( html );
+    }
+
+    function renderMyAccountCard( addr ) {
+        var isDefault = +addr.is_default === 1;
+        var cardLabel = addr.label
+            ? esc( addr.label )
+            : esc( addr.first_name );
+        var fullName  = esc( addr.first_name + ( addr.last_name ? ' ' + addr.last_name : '' ) );
+        var district  = codeToDistrict( addr.state );
+
+        var defaultBadge = isDefault
+            ? ' <span class="aab-default-badge">' + esc( i18n.default_badge || 'Default' ) + '</span>'
+            : '';
+
+        var setDefaultBtn = ! isDefault
+            ? '<button type="button" class="aab-ma-default-btn aab-ma-action-btn" data-id="' + addr.id + '">'
+              + esc( i18n.set_default || 'Set as Default' )
+              + '</button>'
+            : '';
+
+        var lines = [ fullName ];
+        if ( addr.phone )    lines.push( esc( addr.phone ) );
+        if ( addr.address_1) lines.push( esc( addr.address_1 ) );
+        if ( addr.address_2) lines.push( esc( addr.address_2 ) );
+        if ( district )      lines.push( esc( district ) + ( addr.postcode ? ', ' + esc( addr.postcode ) : '' ) );
+
+        return [
+            '<div class="aab-ma-card' + ( isDefault ? ' aab-ma-card--default' : '' ) + '" data-id="' + addr.id + '">',
+            '  <div class="aab-ma-card-top">',
+            '    <div class="aab-addr-icon">' + HOUSE_SVG + '</div>',
+            '    <div class="aab-ma-card-label">' + cardLabel + defaultBadge + '</div>',
+            '  </div>',
+            '  <div class="aab-ma-card-body">',
+            lines.map( function ( l ) { return '    <div class="aab-ma-addr-line">' + l + '</div>'; } ).join( '' ),
+            '  </div>',
+            '  <div class="aab-ma-card-actions">',
+            '    <button type="button" class="aab-ma-edit-btn aab-ma-action-btn" data-id="' + addr.id + '">Edit</button>',
+            setDefaultBtn,
+            '    <button type="button" class="aab-ma-delete-btn aab-ma-action-btn aab-ma-delete-btn--danger" data-id="' + addr.id + '">Delete</button>',
+            '  </div>',
+            '</div>',
+        ].join( '' );
+    }
+
+    function deleteAddress( id ) {
+        $.post( cfg.ajaxUrl, {
+            action:     'auth_popup_delete_address',
+            nonce:      cfg.nonce,
+            address_id: id,
+        } ).done( function ( res ) {
+            if ( res.success ) {
+                cachedAddresses = res.data.addresses || [];
+                renderMyAccountList( cachedAddresses );
+            }
+        } );
+    }
+
+    function setDefaultAddress( id ) {
+        $.post( cfg.ajaxUrl, {
+            action:     'auth_popup_set_default_address',
+            nonce:      cfg.nonce,
+            address_id: id,
+        } ).done( function ( res ) {
+            if ( res.success ) {
+                cachedAddresses = res.data.addresses || [];
+                renderMyAccountList( cachedAddresses );
+            }
+        } );
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       CHECKOUT INLINE SECTIONS
+    ══════════════════════════════════════════════════════════════════ */
 
     /* ── Wait for WooCommerce checkout DOM ──────────────────────────── */
     function waitForCheckout( cb ) {
@@ -201,7 +319,7 @@
         } );
     }
 
-    /* ── Render a single address card ───────────────────────────────── */
+    /* ── Render a single address card (checkout inline) ─────────────── */
     function renderCard( addr ) {
         var isSelected = +addr.id === +selectedId;
         var cardName   = addr.label
@@ -229,7 +347,7 @@
     function bindEvents() {
         $( document )
 
-            /* Select a card (clicking anywhere on the label except Edit button) */
+            /* Select a card (checkout inline — clicking anywhere except Edit) */
             .on( 'click', '.aab-addr-card', function ( e ) {
                 if ( $( e.target ).closest( '.aab-edit-inline-btn' ).length ) return;
                 var id   = +$( this ).data( 'id' );
@@ -241,15 +359,43 @@
                 applyToCheckout( addr );
             } )
 
-            /* Edit button */
+            /* Edit button (checkout inline) */
             .on( 'click', '.aab-edit-inline-btn', function ( e ) {
                 e.stopPropagation();
                 openForm( +$( this ).data( 'id' ) );
             } )
 
-            /* Add new address (inline section buttons) */
+            /* Add new address (checkout inline section buttons) */
             .on( 'click', '.aab-add-new-inline', function () {
                 openForm( 0 );
+            } )
+
+            /* ── My Account events ── */
+
+            /* Add new address (my-account header button) */
+            .on( 'click', '.aab-ma-add-btn', function () {
+                openForm( 0 );
+            } )
+
+            /* Edit button (my-account card) */
+            .on( 'click', '.aab-ma-edit-btn', function ( e ) {
+                e.stopPropagation();
+                openForm( +$( this ).data( 'id' ) );
+            } )
+
+            /* Set as Default button (my-account card) */
+            .on( 'click', '.aab-ma-default-btn', function ( e ) {
+                e.stopPropagation();
+                setDefaultAddress( +$( this ).data( 'id' ) );
+            } )
+
+            /* Delete button (my-account card) */
+            .on( 'click', '.aab-ma-delete-btn', function ( e ) {
+                e.stopPropagation();
+                var id  = +$( this ).data( 'id' );
+                var msg = i18n.delete_confirm || 'Delete this address? This cannot be undone.';
+                if ( ! window.confirm( msg ) ) return;
+                deleteAddress( id );
             } )
 
             /* Modal close */
@@ -395,17 +541,22 @@
                 if ( res.success ) {
                     cachedAddresses = res.data.addresses || [];
 
-                    /* Select the newly saved address */
-                    var savedId = +res.data.address_id;
-                    if ( savedId ) selectedId = savedId;
+                    if ( isMyAccount ) {
+                        closeModal();
+                        renderMyAccountList( cachedAddresses );
+                    } else {
+                        /* Checkout mode: select the newly saved address */
+                        var savedId = +res.data.address_id;
+                        if ( savedId ) selectedId = savedId;
 
-                    renderInlineList( cachedAddresses );
-                    markSelected( selectedId );
+                        renderInlineList( cachedAddresses );
+                        markSelected( selectedId );
 
-                    var saved = findAddress( selectedId );
-                    if ( saved ) applyToCheckout( saved );
+                        var saved = findAddress( selectedId );
+                        if ( saved ) applyToCheckout( saved );
 
-                    closeModal();
+                        closeModal();
+                    }
                 } else {
                     var msg = res.data && res.data.message ? res.data.message : 'Error saving address.';
                     $err.text( msg ).show();

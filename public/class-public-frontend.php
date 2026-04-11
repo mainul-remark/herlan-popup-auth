@@ -15,6 +15,12 @@ class Auth_Popup_Public_Frontend {
         // Override checkout form template to reorder sections
         add_filter( 'woocommerce_locate_template', [ __CLASS__, 'locate_checkout_template' ], 10, 3 );
 
+        // Replace WC default edit-address page with our custom address book.
+        // Priority 0 starts buffering before WC renders anything; PHP_INT_MAX
+        // discards that output and injects our container instead.
+        add_action( 'woocommerce_account_edit-address_endpoint', [ __CLASS__, 'address_book_ob_start' ], 0 );
+        add_action( 'woocommerce_account_edit-address_endpoint', [ __CLASS__, 'address_book_ob_end'   ], PHP_INT_MAX );
+
         // Checkout appearance settings
         if ( Auth_Popup_Core::get_setting( 'checkout_disable_ship_to_different', '1' ) === '1' ) {
             add_filter( 'woocommerce_cart_needs_shipping_address', '__return_false' );
@@ -75,6 +81,7 @@ class Auth_Popup_Public_Frontend {
                 'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
                 'nonce'            => wp_create_nonce( 'auth_popup_nonce' ),
                 'isCheckout'       => function_exists( 'is_checkout' ) && is_checkout() ? '1' : '0',
+                'isMyAccount'      => function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'edit-address' ) ? '1' : '0',
                 'hideShippingForm' => Auth_Popup_Core::get_setting( 'checkout_hide_shipping_form', '1' ),
                 'i18n'       => [
                     'add_new'        => __( 'Add New Address', 'auth-popup' ),
@@ -83,6 +90,11 @@ class Auth_Popup_Public_Frontend {
                     'cancel'         => __( 'Cancel', 'auth-popup' ),
                     'add_address'    => __( 'Add Address', 'auth-popup' ),
                     'edit_address'   => __( 'Edit Address', 'auth-popup' ),
+                    'delete_confirm' => __( 'Delete this address? This cannot be undone.', 'auth-popup' ),
+                    'set_default'    => __( 'Set as Default', 'auth-popup' ),
+                    'default_badge'  => __( 'Default', 'auth-popup' ),
+                    'my_addresses'   => __( 'My Addresses', 'auth-popup' ),
+                    'no_addresses'   => __( 'No saved addresses yet. Add your first address below.', 'auth-popup' ),
                 ],
             ] );
         }
@@ -138,7 +150,8 @@ class Auth_Popup_Public_Frontend {
      * Only overrides when the theme has no template of its own.
      */
     public static function locate_checkout_template( string $template, string $template_name, string $template_path ): string {
-        if ( 'checkout/form-checkout.php' !== $template_name ) {
+        $handled = [ 'checkout/form-checkout.php', 'myaccount/edit-address.php' ];
+        if ( ! in_array( $template_name, $handled, true ) ) {
             return $template;
         }
 
@@ -157,6 +170,33 @@ class Auth_Popup_Public_Frontend {
         }
 
         return $template;
+    }
+
+    /**
+     * Start output buffering before WooCommerce renders the edit-address page.
+     * Only intercepts the listing page (empty $value), not billing/shipping sub-pages.
+     */
+    public static function address_book_ob_start( $value ): void {
+        if ( '' !== (string) $value ) {
+            return;
+        }
+        ob_start();
+    }
+
+    /**
+     * Discard whatever WooCommerce rendered and inject our custom container.
+     * The JS (address-manager.js) detects isMyAccount and populates it via AJAX.
+     */
+    public static function address_book_ob_end( $value ): void {
+        if ( '' !== (string) $value ) {
+            return;
+        }
+        if ( ob_get_level() > 0 ) {
+            ob_end_clean();
+        }
+        echo '<div id="aab-my-account-addresses" class="aab-ma-wrap">'
+            . '<div class="aab-inline-loading">Loading addresses&hellip;</div>'
+            . '</div>';
     }
 
     public static function prefill_checkout_shipping( $value, string $key ) {
