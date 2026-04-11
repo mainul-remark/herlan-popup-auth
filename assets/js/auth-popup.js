@@ -831,9 +831,17 @@
             // WooCommerce nav item click → show content in modal (mobile only)
             $(document).on('click', '.woocommerce-MyAccount-navigation a', (e) => {
                 if (!isMobile()) return;
-                e.preventDefault();
                 const $a = $(e.currentTarget);
-                openModal($a.attr('href'), $a.text().trim());
+                const href = $a.attr('href') || '';
+                // Logout link: let the browser follow it directly (no modal)
+                if (
+                    href.indexOf('customer-logout') !== -1 ||
+                    $a.closest('li').hasClass('woocommerce-MyAccount-navigation-link--customer-logout')
+                ) {
+                    return;
+                }
+                e.preventDefault();
+                openModal(href, $a.text().trim());
             });
 
             // Close modal (back or × button)

@@ -89,8 +89,13 @@
         { code: 'BD-64', name: 'Thakurgaon' },
     ];
 
-    /* SVG house icon */
-    var HOUSE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>';
+    /* SVG icons */
+    var HOUSE_SVG   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>';
+    var EDIT_SVG    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    var TRASH_SVG   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
+    var STAR_SVG    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+    var STAR_FILLED = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+    var PLUS_SVG    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 
     /* ── State ─────────────────────────────────────────────────────── */
     var $modal;
@@ -174,17 +179,28 @@
     }
 
     function setMyAccountWrap( html ) {
-        $( '#aab-my-account-addresses' ).html( html );
+        var el = document.getElementById( 'aab-my-account-addresses' );
+        if ( el ) {
+            el.innerHTML = html;
+        }
     }
 
     function renderMyAccountList( addresses ) {
+        var addBtn = '<button type="button" class="aab-ma-add-btn" title="' + esc( i18n.add_new || 'Add New Address' ) + '">'
+            + '<span class="aab-ma-add-btn__icon">' + PLUS_SVG + '</span>'
+            + '<span>' + esc( i18n.add_new || 'Add New Address' ) + '</span>'
+            + '</button>';
+
         var html = '<div class="aab-ma-header">'
             + '<h2 class="aab-ma-title">' + esc( i18n.my_addresses || 'My Addresses' ) + '</h2>'
-            + '<button type="button" class="aab-ma-add-btn">+ ' + esc( i18n.add_new || 'Add New Address' ) + '</button>'
+            + addBtn
             + '</div>';
 
         if ( ! addresses.length ) {
-            html += '<div class="aab-inline-empty">' + esc( i18n.no_addresses || 'No saved addresses yet. Add your first address below.' ) + '</div>';
+            html += '<div class="aab-ma-empty">'
+                + '<div class="aab-ma-empty__icon">' + HOUSE_SVG + '</div>'
+                + '<p class="aab-ma-empty__text">' + esc( i18n.no_addresses || 'No saved addresses yet.' ) + '</p>'
+                + '</div>';
         } else {
             html += '<div class="aab-ma-grid">'
                 + addresses.map( renderMyAccountCard ).join( '' )
@@ -196,42 +212,43 @@
 
     function renderMyAccountCard( addr ) {
         var isDefault = +addr.is_default === 1;
-        var cardLabel = addr.label
-            ? esc( addr.label )
-            : esc( addr.first_name );
+        var cardLabel = addr.label ? esc( addr.label ) : esc( addr.first_name );
         var fullName  = esc( addr.first_name + ( addr.last_name ? ' ' + addr.last_name : '' ) );
         var district  = codeToDistrict( addr.state );
 
-        var defaultBadge = isDefault
-            ? ' <span class="aab-default-badge">' + esc( i18n.default_badge || 'Default' ) + '</span>'
-            : '';
-
-        var setDefaultBtn = ! isDefault
-            ? '<button type="button" class="aab-ma-default-btn aab-ma-action-btn" data-id="' + addr.id + '">'
-              + esc( i18n.set_default || 'Set as Default' )
-              + '</button>'
-            : '';
-
-        var lines = [ fullName ];
+        var lines = [];
+        if ( fullName )      lines.push( fullName );
         if ( addr.phone )    lines.push( esc( addr.phone ) );
         if ( addr.address_1) lines.push( esc( addr.address_1 ) );
         if ( addr.address_2) lines.push( esc( addr.address_2 ) );
-        if ( district )      lines.push( esc( district ) + ( addr.postcode ? ', ' + esc( addr.postcode ) : '' ) );
+        var distLine = [ district, addr.postcode ].filter( Boolean ).map( esc ).join( ', ' );
+        if ( distLine )      lines.push( distLine );
+
+        var defaultBadge = isDefault
+            ? '<span class="aab-default-badge">' + STAR_FILLED + esc( i18n.default_badge || 'Default' ) + '</span>'
+            : '';
+
+        var starBtn = ! isDefault
+            ? '<button type="button" class="aab-ma-icon-btn aab-ma-default-btn" data-id="' + addr.id + '" title="' + esc( i18n.set_default || 'Set as Default' ) + '" aria-label="' + esc( i18n.set_default || 'Set as Default' ) + '">' + STAR_SVG + '</button>'
+            : '';
 
         return [
             '<div class="aab-ma-card' + ( isDefault ? ' aab-ma-card--default' : '' ) + '" data-id="' + addr.id + '">',
-            '  <div class="aab-ma-card-top">',
-            '    <div class="aab-addr-icon">' + HOUSE_SVG + '</div>',
-            '    <div class="aab-ma-card-label">' + cardLabel + defaultBadge + '</div>',
+            '  <div class="aab-ma-card-head">',
+            '    <div class="aab-ma-card-label-wrap">',
+            '      <span class="aab-ma-card-icon' + ( isDefault ? ' aab-ma-card-icon--default' : '' ) + '">' + HOUSE_SVG + '</span>',
+            '      <span class="aab-ma-card-label">' + cardLabel + '</span>',
+            '    </div>',
+            '    <div class="aab-ma-card-actions">',
+            starBtn,
+            '      <button type="button" class="aab-ma-icon-btn aab-ma-edit-btn" data-id="' + addr.id + '" title="Edit" aria-label="Edit address">' + EDIT_SVG + '</button>',
+            '      <button type="button" class="aab-ma-icon-btn aab-ma-delete-btn" data-id="' + addr.id + '" title="Delete" aria-label="Delete address">' + TRASH_SVG + '</button>',
+            '    </div>',
             '  </div>',
             '  <div class="aab-ma-card-body">',
-            lines.map( function ( l ) { return '    <div class="aab-ma-addr-line">' + l + '</div>'; } ).join( '' ),
+            lines.map( function ( l ) { return '<p class="aab-ma-addr-line">' + l + '</p>'; } ).join( '' ),
             '  </div>',
-            '  <div class="aab-ma-card-actions">',
-            '    <button type="button" class="aab-ma-edit-btn aab-ma-action-btn" data-id="' + addr.id + '">Edit</button>',
-            setDefaultBtn,
-            '    <button type="button" class="aab-ma-delete-btn aab-ma-action-btn aab-ma-delete-btn--danger" data-id="' + addr.id + '">Delete</button>',
-            '  </div>',
+            defaultBadge ? '  <div class="aab-ma-card-foot">' + defaultBadge + '</div>' : '',
             '</div>',
         ].join( '' );
     }
@@ -250,6 +267,10 @@
     }
 
     function setDefaultAddress( id ) {
+        /* Disable the star button immediately for instant feedback */
+        var $btn = $( '.aab-ma-default-btn[data-id="' + id + '"]' );
+        $btn.prop( 'disabled', true ).addClass( 'aab-ma-icon-btn--loading' );
+
         $.post( cfg.ajaxUrl, {
             action:     'auth_popup_set_default_address',
             nonce:      cfg.nonce,
@@ -259,6 +280,9 @@
                 cachedAddresses = res.data.addresses || [];
                 renderMyAccountList( cachedAddresses );
             }
+        } ).fail( function () {
+            /* Re-enable on network error so user can retry */
+            $btn.prop( 'disabled', false ).removeClass( 'aab-ma-icon-btn--loading' );
         } );
     }
 
