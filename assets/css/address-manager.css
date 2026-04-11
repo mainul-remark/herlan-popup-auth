@@ -757,3 +757,12 @@ body.aab-modal-open { overflow: hidden; }
         margin: 0;
     }
 }
+
+/* ── Mobile: raise address form above the My Account slide-in panel ─
+   #ap-acct-modal has z-index: 999985 on ≤768px; the address form
+   modal must sit above it so it isn't hidden behind the panel.      */
+@media (max-width: 768px) {
+    .aab-modal {
+        z-index: 999990;
+    }
+}

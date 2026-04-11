@@ -601,7 +601,7 @@
                 if ( res.success ) {
                     cachedAddresses = res.data.addresses || [];
 
-                    if ( isMyAccount ) {
+                    if ( isMyAccount || document.getElementById( 'aab-my-account-addresses' ) ) {
                         closeModal();
                         renderMyAccountList( cachedAddresses );
                     } else {
