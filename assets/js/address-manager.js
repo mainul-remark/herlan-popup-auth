@@ -112,9 +112,45 @@
         }
 
         if ( isMyAccount ) {
+            // Full page load of /my-account/edit-address/ (desktop)
             loadMyAccountAddresses();
+        } else {
+            // Mobile: auth-popup.js fetches the page and injects only
+            // .woocommerce-MyAccount-content HTML into a modal. The PHP
+            // flag isMyAccount is '0' on the parent page, so we watch
+            // for #aab-my-account-addresses appearing in the DOM instead.
+            watchForMyAccountContainer();
         }
     } );
+
+    /**
+     * Use a MutationObserver to detect when the address book container is
+     * injected into the DOM by the mobile modal (auth-popup.js fetch flow).
+     * Fires loadMyAccountAddresses() exactly once when the node appears.
+     */
+    function watchForMyAccountContainer() {
+        if ( ! window.MutationObserver ) return;
+
+        var observer = new MutationObserver( function ( mutations ) {
+            for ( var i = 0; i < mutations.length; i++ ) {
+                var nodes = mutations[ i ].addedNodes;
+                for ( var j = 0; j < nodes.length; j++ ) {
+                    var node = nodes[ j ];
+                    if ( node.nodeType !== 1 ) continue;
+                    var found = node.id === 'aab-my-account-addresses'
+                        ? node
+                        : node.querySelector( '#aab-my-account-addresses' );
+                    if ( found ) {
+                        observer.disconnect();
+                        loadMyAccountAddresses();
+                        return;
+                    }
+                }
+            }
+        } );
+
+        observer.observe( document.body, { childList: true, subtree: true } );
+    }
 
     /* ══════════════════════════════════════════════════════════════════
        MY ACCOUNT ADDRESS BOOK
