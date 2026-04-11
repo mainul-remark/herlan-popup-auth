@@ -16,6 +16,10 @@
 
         /* ── Init ──────────────────────────────────────────────────── */
         init() {
+            // Runs for all users — has its own isLoggedIn guard inside
+            this.initAccountDrawer();
+
+            // Everything below requires the popup overlay (guest users only)
             this.$overlay = $('#auth-popup-overlay');
             if (!this.$overlay.length) return;
 
@@ -39,7 +43,6 @@
             this.initGoogle();
             this.initFacebook();
             this.initCheckout();
-            this.initAccountDrawer();
             this.loadLoyaltyRules();
             this.initDatepicker();
         },
@@ -771,25 +774,12 @@
             });
         },
 
-        /* ── Mobile Account Drawer & Content Modal ──────────────────── */
+        /* ── Mobile Account Content Modal ───────────────────────────── */
         initAccountDrawer() {
             if (AuthPopup.isLoggedIn !== '1') return;
 
+            // Inject full-screen content modal
             $('body').append(
-                '<div id="ap-acct-drawer">' +
-                    '<div class="ap-acct-drawer-overlay"></div>' +
-                    '<div class="ap-acct-drawer-panel">' +
-                        '<div class="ap-acct-drawer-header">' +
-                            '<span class="ap-acct-drawer-title">My Account</span>' +
-                            '<button class="ap-acct-drawer-close" type="button">' +
-                                '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>' +
-                            '</button>' +
-                        '</div>' +
-                        '<nav class="ap-acct-drawer-nav" id="ap-acct-drawer-nav">' +
-                            '<div class="ap-acct-spinner-wrap"><span class="ap-acct-spinner"></span></div>' +
-                        '</nav>' +
-                    '</div>' +
-                '</div>' +
                 '<div id="ap-acct-modal">' +
                     '<div class="ap-acct-modal-header">' +
                         '<button type="button" class="ap-acct-modal-back" id="ap-acct-modal-back">' +
@@ -804,31 +794,7 @@
                 '</div>'
             );
 
-            let navLoaded = false;
             const isMobile = () => window.innerWidth <= 768;
-
-            const openDrawer = () => {
-                $('#ap-acct-drawer').addClass('open');
-                $('body').addClass('ap-no-scroll');
-                if (!navLoaded) {
-                    navLoaded = true;
-                    this.loadAccountNav();
-                }
-            };
-
-            const closeDrawer = () => {
-                $('#ap-acct-drawer').removeClass('open');
-                $('body').removeClass('ap-no-scroll');
-            };
-
-            const fetchPage = (url) => {
-                return fetch(url, { credentials: 'same-origin' })
-                    .then((r) => {
-                        if (!r.ok) throw new Error('http_' + r.status);
-                        return r.text();
-                    })
-                    .then((html) => new DOMParser().parseFromString(html, 'text/html'));
-            };
 
             const openModal = (url, title) => {
                 $('#ap-acct-modal-title').text(title || 'My Account');
@@ -838,9 +804,14 @@
                 $('#ap-acct-modal').addClass('open');
                 $('body').addClass('ap-no-scroll');
 
-                fetchPage(url)
-                    .then((doc) => {
-                        const el = doc.querySelector('.woocommerce-MyAccount-content');
+                fetch(url, { credentials: 'same-origin' })
+                    .then((r) => {
+                        if (!r.ok) throw new Error('http_' + r.status);
+                        return r.text();
+                    })
+                    .then((html) => {
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const el  = doc.querySelector('.woocommerce-MyAccount-content');
                         $('#ap-acct-modal-body').html(
                             el ? el.innerHTML : '<p class="ap-acct-error">Content not available.</p>'
                         );
@@ -857,56 +828,21 @@
                 $('body').removeClass('ap-no-scroll');
             };
 
-            // Account button → open drawer (mobile only)
-            $(document).on('click', '.herlan_mobile_drawer_container ul li a[href*="my-account"]', (e) => {
+            // WooCommerce nav item click → show content in modal (mobile only)
+            $(document).on('click', '.woocommerce-MyAccount-navigation a', (e) => {
                 if (!isMobile()) return;
                 e.preventDefault();
-                openDrawer();
-            });
-
-            // Close drawer
-            $(document).on('click', '.ap-acct-drawer-overlay, .ap-acct-drawer-close', closeDrawer);
-
-            // Nav item → load content in modal
-            $(document).on('click', '#ap-acct-drawer-nav a', (e) => {
-                e.preventDefault();
-                const $a  = $(e.currentTarget);
-                closeDrawer();
+                const $a = $(e.currentTarget);
                 openModal($a.attr('href'), $a.text().trim());
             });
 
-            // Modal back → reopen drawer
-            $(document).on('click', '#ap-acct-modal-back', () => {
-                closeModal();
-                openDrawer();
-            });
-
-            // Modal close
-            $(document).on('click', '#ap-acct-modal-close', closeModal);
+            // Close modal (back or × button)
+            $(document).on('click', '#ap-acct-modal-back, #ap-acct-modal-close', closeModal);
 
             // ESC key
             $(document).on('keydown.acct', (e) => {
-                if (e.key !== 'Escape') return;
-                if ($('#ap-acct-modal').hasClass('open')) { closeModal(); return; }
-                if ($('#ap-acct-drawer').hasClass('open')) closeDrawer();
+                if (e.key === 'Escape' && $('#ap-acct-modal').hasClass('open')) closeModal();
             });
-        },
-
-        loadAccountNav() {
-            fetch(AuthPopup.myAccountUrl, { credentials: 'same-origin' })
-                .then((r) => r.text())
-                .then((html) => {
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    const nav = doc.querySelector('.woocommerce-MyAccount-navigation');
-                    $('#ap-acct-drawer-nav').html(
-                        nav ? nav.innerHTML : '<p class="ap-acct-error">Navigation not available.</p>'
-                    );
-                })
-                .catch(() => {
-                    $('#ap-acct-drawer-nav').html(
-                        '<p class="ap-acct-error">Failed to load navigation.</p>'
-                    );
-                });
         },
 
         /* ── jQuery UI Datepicker ────────────────────────────────────── */
