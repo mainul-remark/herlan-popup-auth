@@ -470,18 +470,39 @@
             /* Cancel button */
             .on( 'click', '.aab-cancel-btn', closeModal );
 
+        /* Phone field — block non-digit keystrokes */
+        $( document ).on( 'keydown', '.aab-form [name="phone"]', function ( e ) {
+            // Always allow: backspace(8), tab(9), enter(13), escape(27),
+            // delete(46), home(35), end(36), arrow keys(37-40)
+            var nav = [ 8, 9, 13, 27, 35, 36, 37, 38, 39, 40, 46 ];
+            if ( nav.indexOf( e.which ) !== -1 ) return;
+            // Allow Ctrl/Cmd + A, C, V, X (select-all, copy, paste, cut)
+            if ( ( e.ctrlKey || e.metaKey ) && [ 65, 67, 86, 88 ].indexOf( e.which ) !== -1 ) return;
+            // Digits row (48-57) and numpad (96-105)
+            if ( ( e.which >= 48 && e.which <= 57 ) || ( e.which >= 96 && e.which <= 105 ) ) return;
+            // Block everything else
+            e.preventDefault();
+        } );
+
+        /* Phone field — strip non-digits on paste / autofill, then validate */
+        $( document ).on( 'input', '.aab-form [name="phone"]', function () {
+            var $el  = $( this );
+            var raw  = $el.val();
+            var digits = raw.replace( /\D/g, '' );
+            // Remove any non-digit that slipped in (paste, autofill, mobile keyboard)
+            if ( raw !== digits ) {
+                $el.val( digits );
+            }
+            if ( digits.length >= 11 ) {
+                validatePhoneField( $el );
+            } else {
+                clearFieldError( $el );
+            }
+        } );
+
         /* Phone field — validate on blur */
         $( document ).on( 'blur', '.aab-form [name="phone"]', function () {
             validatePhoneField( $( this ) );
-        } );
-
-        /* Clear phone error as user types */
-        $( document ).on( 'input', '.aab-form [name="phone"]', function () {
-            if ( $( this ).val().replace( /\D/g, '' ).length >= 11 ) {
-                validatePhoneField( $( this ) );
-            } else {
-                clearFieldError( $( this ) );
-            }
         } );
 
         $( document ).on( 'keyup', function ( e ) {
