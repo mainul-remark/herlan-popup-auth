@@ -23,13 +23,26 @@ class Auth_Popup_Core {
             self::create_tables();
         }
 
-        // Register the migration batch hook (needed for both Action Scheduler & WP-Cron)
-        add_action( 'auth_popup_migrate_phones_batch',   [ __CLASS__, 'run_migration_batch'          ] );
-        add_action( 'auth_popup_import_wc_addresses',    [ __CLASS__, 'run_wc_address_import_batch'  ] );
+        // Register the migration batch hooks (needed for both Action Scheduler & WP-Cron)
+        add_action( 'auth_popup_migrate_user_data_batch', [ __CLASS__, 'run_user_data_migration_batch' ] );
+        add_action( 'auth_popup_import_wc_addresses',     [ __CLASS__, 'run_wc_address_import_batch'  ] );
+        // Keep legacy hooks registered so any still-queued batches from old installs can finish
+        add_action( 'auth_popup_migrate_phones_batch',    [ __CLASS__, 'run_migration_batch'           ] );
+        add_action( 'auth_popup_migrate_emails_batch',    [ __CLASS__, 'run_email_migration_batch'     ] );
 
         // Kick off WC address import if not yet done
         if ( ! get_option( 'auth_popup_wc_address_import_done' ) ) {
             self::schedule_wc_address_import( 0 );
+        }
+
+        // Kick off combined user-data migration if not yet done.
+        // If both legacy migrations are already complete (existing installs), mark it done immediately.
+        if ( ! get_option( 'auth_popup_user_data_migration_done' ) ) {
+            if ( get_option( 'auth_popup_phone_migration_done' ) && get_option( 'auth_popup_email_migration_done' ) ) {
+                update_option( 'auth_popup_user_data_migration_done', '1' );
+            } else {
+                self::schedule_user_data_migration( 0 );
+            }
         }
 
         // Boot modules
@@ -56,8 +69,9 @@ class Auth_Popup_Core {
             update_option( 'auth_popup_settings', self::default_settings() );
         }
 
-        // Schedule background migration of existing billing_phone entries
-        self::schedule_migration_batch( 0 );
+        // Schedule combined mobile + email migration
+        delete_option( 'auth_popup_user_data_migration_done' );
+        self::schedule_user_data_migration( 0 );
 
         // Schedule import of existing WC addresses into the address book
         delete_option( 'auth_popup_wc_address_import_done' );
@@ -131,7 +145,164 @@ class Auth_Popup_Core {
         update_option( 'auth_popup_db_version', '1.2' );
     }
 
-    /* ── Background Phone Migration ────────────────────────────────── */
+    /* ── Combined Mobile + Email Migration ────────────────────────── */
+
+    private static function schedule_user_data_migration( int $offset ): void {
+        if ( get_option( 'auth_popup_user_data_migration_done' ) ) {
+            return;
+        }
+
+        if ( function_exists( 'as_schedule_single_action' ) ) {
+            as_schedule_single_action(
+                time() + 5,
+                'auth_popup_migrate_user_data_batch',
+                [ $offset ],
+                'auth-popup'
+            );
+        } else {
+            wp_schedule_single_event(
+                time() + 10,
+                'auth_popup_migrate_user_data_batch',
+                [ $offset ]
+            );
+        }
+    }
+
+    /**
+     * Process one batch: for each user migrate billing_phone → profiles table
+     * AND billing_email → wp_users.user_email (only when user_email is empty).
+     * Re-schedules itself until no more users remain.
+     */
+    public static function run_user_data_migration_batch( int $offset = 0 ): void {
+        global $wpdb;
+
+        $user_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT user_id
+             FROM {$wpdb->usermeta}
+             WHERE meta_key IN ('billing_phone', 'billing_email')
+               AND meta_value != ''
+             ORDER BY user_id ASC
+             LIMIT %d OFFSET %d",
+            self::MIGRATION_BATCH,
+            $offset
+        ) );
+
+        if ( empty( $user_ids ) ) {
+            update_option( 'auth_popup_user_data_migration_done', '1' );
+            return;
+        }
+
+        $profiles_table = $wpdb->prefix . 'auth_popup_user_profiles';
+
+        foreach ( $user_ids as $uid ) {
+            $uid = (int) $uid;
+
+            // Phone: billing_phone → profiles table (do not overwrite existing)
+            $raw_phone = (string) get_user_meta( $uid, 'billing_phone', true );
+            if ( $raw_phone ) {
+                $normalized = Auth_Popup_SMS_Service::normalise_phone( $raw_phone );
+                if ( strlen( $normalized ) >= 11 ) {
+                    $wpdb->query( $wpdb->prepare(
+                        "INSERT INTO {$profiles_table} (user_id, phone)
+                         VALUES (%d, %s)
+                         ON DUPLICATE KEY UPDATE
+                             phone = IF(phone IS NULL OR phone = '', VALUES(phone), phone)",
+                        $uid,
+                        $normalized
+                    ) );
+                }
+            }
+
+            // Email: billing_email → wp_users.user_email (only if currently empty)
+            $billing_email = (string) get_user_meta( $uid, 'billing_email', true );
+            if ( $billing_email ) {
+                $wpdb->query( $wpdb->prepare(
+                    "UPDATE {$wpdb->users}
+                     SET user_email = %s
+                     WHERE ID = %d
+                       AND ( user_email = '' OR user_email IS NULL )",
+                    $billing_email,
+                    $uid
+                ) );
+            }
+        }
+
+        self::schedule_user_data_migration( $offset + self::MIGRATION_BATCH );
+    }
+
+    /**
+     * Return combined migration progress for admin display.
+     */
+    public static function user_data_migration_status(): array {
+        global $wpdb;
+
+        $done = (bool) get_option( 'auth_popup_user_data_migration_done' );
+
+        // Phone counts
+        $phone_total    = (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_phone' AND meta_value != ''"
+        );
+        $phone_migrated = (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}auth_popup_user_profiles
+             WHERE phone IS NOT NULL AND phone != ''"
+        );
+
+        // Email counts
+        $email_total     = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT user_id) FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_email' AND meta_value != ''"
+        );
+        $email_remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$wpdb->usermeta} um
+             INNER JOIN {$wpdb->users} u ON u.ID = um.user_id
+             WHERE um.meta_key   = 'billing_email'
+               AND um.meta_value != ''
+               AND ( u.user_email = '' OR u.user_email IS NULL )"
+        );
+        $email_synced = max( 0, $email_total - $email_remaining );
+
+        // Combined totals
+        $grand_total = $phone_total + $email_total;
+        $grand_done  = $phone_migrated + $email_synced;
+        $percent     = $grand_total > 0
+            ? min( 100, (int) round( ( $grand_done / $grand_total ) * 100 ) )
+            : 100;
+
+        // Next scheduled run — check new hook first, then legacy hooks
+        $next_run = null;
+        $hooks    = [ 'auth_popup_migrate_user_data_batch', 'auth_popup_migrate_phones_batch', 'auth_popup_migrate_emails_batch' ];
+        if ( function_exists( 'as_get_scheduled_actions' ) ) {
+            foreach ( $hooks as $hook ) {
+                $pending = as_get_scheduled_actions( [
+                    'hook'     => $hook,
+                    'status'   => \ActionScheduler_Store::STATUS_PENDING,
+                    'per_page' => 1,
+                ] );
+                if ( ! empty( $pending ) ) {
+                    $action   = reset( $pending );
+                    $next_run = $action->get_schedule()->get_date()->format( 'Y-m-d H:i:s' );
+                    break;
+                }
+            }
+        } else {
+            foreach ( $hooks as $hook ) {
+                if ( $next = wp_next_scheduled( $hook ) ) {
+                    $next_run = date( 'Y-m-d H:i:s', $next );
+                    break;
+                }
+            }
+        }
+
+        return compact(
+            'done', 'phone_total', 'phone_migrated',
+            'email_total', 'email_synced', 'email_remaining',
+            'grand_total', 'grand_done', 'percent', 'next_run'
+        );
+    }
+
+    /* ── Background Phone Migration (legacy — kept for queued batches) ── */
 
     /**
      * Schedule the next migration batch using Action Scheduler (preferred,
@@ -284,6 +455,118 @@ class Auth_Popup_Core {
         );
 
         return compact( 'done', 'total', 'imported' );
+    }
+
+    /* ── Background Email Migration ───────────────────────────────── */
+
+    /**
+     * Schedule the next email migration batch.
+     * No offset needed — each run queries the first N users still missing an email.
+     */
+    private static function schedule_email_migration(): void {
+        if ( get_option( 'auth_popup_email_migration_done' ) ) {
+            return;
+        }
+
+        if ( function_exists( 'as_schedule_single_action' ) ) {
+            as_schedule_single_action(
+                time() + 5,
+                'auth_popup_migrate_emails_batch',
+                [],
+                'auth-popup'
+            );
+        } else {
+            wp_schedule_single_event(
+                time() + 10,
+                'auth_popup_migrate_emails_batch'
+            );
+        }
+    }
+
+    /**
+     * Process one batch: copy billing_email → wp_users.user_email for users
+     * whose account email is currently empty. Uses a single UPDATE…JOIN for
+     * performance. Re-schedules itself until no rows remain.
+     */
+    public static function run_email_migration_batch(): void {
+        global $wpdb;
+
+        // Update up to MIGRATION_BATCH users in one query
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$wpdb->users} u
+             INNER JOIN {$wpdb->usermeta} um ON um.user_id = u.ID
+             SET u.user_email = um.meta_value
+             WHERE um.meta_key   = 'billing_email'
+               AND um.meta_value != ''
+               AND ( u.user_email = '' OR u.user_email IS NULL )
+             LIMIT %d",
+            self::MIGRATION_BATCH
+        ) );
+
+        // Check if any users still need their email set
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$wpdb->usermeta} um
+             INNER JOIN {$wpdb->users} u ON u.ID = um.user_id
+             WHERE um.meta_key   = 'billing_email'
+               AND um.meta_value != ''
+               AND ( u.user_email = '' OR u.user_email IS NULL )"
+        );
+
+        if ( $remaining === 0 ) {
+            update_option( 'auth_popup_email_migration_done', '1' );
+            return;
+        }
+
+        // More rows remaining — schedule next batch
+        self::schedule_email_migration();
+    }
+
+    /**
+     * Return current email migration progress for admin display.
+     */
+    public static function email_migration_status(): array {
+        global $wpdb;
+
+        $done = (bool) get_option( 'auth_popup_email_migration_done' );
+
+        // Total users that have a billing_email value
+        $total = (int) $wpdb->get_var(
+            "SELECT COUNT(DISTINCT user_id)
+             FROM {$wpdb->usermeta}
+             WHERE meta_key = 'billing_email' AND meta_value != ''"
+        );
+
+        // Remaining: have billing_email but still missing user_email
+        $remaining = (int) $wpdb->get_var(
+            "SELECT COUNT(*)
+             FROM {$wpdb->usermeta} um
+             INNER JOIN {$wpdb->users} u ON u.ID = um.user_id
+             WHERE um.meta_key   = 'billing_email'
+               AND um.meta_value != ''
+               AND ( u.user_email = '' OR u.user_email IS NULL )"
+        );
+
+        $synced  = max( 0, $total - $remaining );
+        $percent = $total > 0 ? min( 100, (int) round( ( $synced / $total ) * 100 ) ) : 100;
+
+        // Next scheduled batch
+        $next_run = null;
+        if ( function_exists( 'as_get_scheduled_actions' ) ) {
+            $pending = as_get_scheduled_actions( [
+                'hook'     => 'auth_popup_migrate_emails_batch',
+                'status'   => \ActionScheduler_Store::STATUS_PENDING,
+                'per_page' => 1,
+            ] );
+            if ( ! empty( $pending ) ) {
+                $action   = reset( $pending );
+                $next_run = $action->get_schedule()->get_date()->format( 'Y-m-d H:i:s' );
+            }
+        } elseif ( $next = wp_next_scheduled( 'auth_popup_migrate_emails_batch' ) ) {
+            $next_run = date( 'Y-m-d H:i:s', $next );
+        }
+
+        return compact( 'done', 'total', 'synced', 'remaining', 'percent', 'next_run' );
     }
 
     /* ── Settings ──────────────────────────────────────────────────── */

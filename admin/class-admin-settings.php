@@ -9,9 +9,9 @@ class Auth_Popup_Admin_Settings {
         add_action( 'admin_enqueue_scripts',  [ __CLASS__, 'enqueue_assets'     ] );
         add_filter( 'plugin_action_links_' . AUTH_POPUP_BASENAME, [ __CLASS__, 'plugin_action_links' ] );
 
-        // Phone migration AJAX
-        add_action( 'wp_ajax_auth_popup_migration_status', [ __CLASS__, 'ajax_migration_status' ] );
-        add_action( 'wp_ajax_auth_popup_run_migration',    [ __CLASS__, 'ajax_run_migration'    ] );
+        // Combined mobile + email migration AJAX
+        add_action( 'wp_ajax_auth_popup_user_data_mig_status', [ __CLASS__, 'ajax_user_data_migration_status' ] );
+        add_action( 'wp_ajax_auth_popup_run_user_data_mig',    [ __CLASS__, 'ajax_run_user_data_migration'    ] );
 
         // WC address import AJAX
         add_action( 'wp_ajax_auth_popup_wc_import_status', [ __CLASS__, 'ajax_wc_import_status' ] );
@@ -116,73 +116,28 @@ class Auth_Popup_Admin_Settings {
         return $links;
     }
 
-    /* ── Migration AJAX ────────────────────────────────────────────── */
+    /* ── Combined Mobile + Email Migration AJAX ───────────────────── */
 
-    public static function ajax_migration_status(): void {
+    public static function ajax_user_data_migration_status(): void {
         check_ajax_referer( 'auth_popup_admin_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Unauthorized' ], 403 );
         }
-
-        global $wpdb;
-
-        $total = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->usermeta}
-             WHERE meta_key = 'billing_phone' AND meta_value != ''"
-        );
-
-        $migrated = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}auth_popup_user_profiles
-             WHERE phone IS NOT NULL AND phone != ''"
-        );
-
-        $done    = (bool) get_option( 'auth_popup_phone_migration_done' );
-        $percent = $total > 0 ? min( 100, (int) round( ( $migrated / $total ) * 100 ) ) : 100;
-
-        // Next scheduled batch
-        $next_run = null;
-        if ( function_exists( 'as_get_scheduled_actions' ) ) {
-            $pending = as_get_scheduled_actions( [
-                'hook'     => 'auth_popup_migrate_phones_batch',
-                'status'   => \ActionScheduler_Store::STATUS_PENDING,
-                'per_page' => 1,
-            ] );
-            if ( ! empty( $pending ) ) {
-                $action   = reset( $pending );
-                $next_run = $action->get_schedule()->get_date()->format( 'Y-m-d H:i:s' );
-            }
-        } elseif ( $next = wp_next_scheduled( 'auth_popup_migrate_phones_batch' ) ) {
-            $next_run = date( 'Y-m-d H:i:s', $next );
-        }
-
-        wp_send_json_success( [
-            'total'    => $total,
-            'migrated' => $migrated,
-            'percent'  => $percent,
-            'done'     => $done,
-            'next_run' => $next_run,
-        ] );
+        wp_send_json_success( Auth_Popup_Core::user_data_migration_status() );
     }
 
-    public static function ajax_run_migration(): void {
+    public static function ajax_run_user_data_migration(): void {
         check_ajax_referer( 'auth_popup_admin_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Unauthorized' ], 403 );
         }
 
-        global $wpdb;
-
         if ( ! empty( $_POST['restart'] ) ) {
-            delete_option( 'auth_popup_phone_migration_done' );
+            delete_option( 'auth_popup_user_data_migration_done' );
         }
 
-        // Calculate offset from rows already migrated
-        $offset = (int) $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}auth_popup_user_profiles
-             WHERE phone IS NOT NULL AND phone != ''"
-        );
-
-        Auth_Popup_Core::run_migration_batch( $offset );
+        // Run one batch immediately starting at offset 0 (idempotent — SQL guards prevent duplicates)
+        Auth_Popup_Core::run_user_data_migration_batch( 0 );
 
         wp_send_json_success( [ 'message' => 'Batch processed.' ] );
     }

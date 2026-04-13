@@ -233,39 +233,51 @@
 
             <!-- Migration -->
             <div id="tab-migration" class="auth-popup-tab-content">
-                <h2><?php esc_html_e( 'Phone Migration Status', 'auth-popup' ); ?></h2>
-                <p class="description"><?php esc_html_e( 'Migrates existing WooCommerce billing_phone numbers into the Auth Popup profiles table so all users can log in via OTP.', 'auth-popup' ); ?></p>
 
-                <div id="ap-migration-box" style="margin-top:16px;max-width:600px;">
+                <!-- Mobile & Email Migration -->
+                <h2><?php esc_html_e( 'Mobile & Email Sync Status', 'auth-popup' ); ?></h2>
+                <p class="description"><?php esc_html_e( 'Syncs existing WooCommerce data into WordPress: billing_phone → Auth Popup profiles table (enables OTP login), billing_email → WordPress account email (only for users whose account email is currently empty). Runs automatically in batches of 200.', 'auth-popup' ); ?></p>
+
+                <div id="ap-udm-box" style="margin-top:16px;max-width:600px;">
                     <table class="form-table" style="margin:0 0 16px;">
                         <tr>
-                            <th style="width:140px;"><?php esc_html_e( 'Status', 'auth-popup' ); ?></th>
-                            <td><span id="ap-mig-status">—</span></td>
+                            <th style="width:160px;"><?php esc_html_e( 'Status', 'auth-popup' ); ?></th>
+                            <td><span id="ap-udm-status">—</span></td>
                         </tr>
                         <tr>
-                            <th><?php esc_html_e( 'Progress', 'auth-popup' ); ?></th>
+                            <th><?php esc_html_e( 'Mobile Numbers', 'auth-popup' ); ?></th>
                             <td>
                                 <div style="background:#ddd;border-radius:4px;height:18px;width:100%;max-width:400px;overflow:hidden;">
-                                    <div id="ap-mig-bar" style="background:#2271b1;height:100%;width:0%;transition:width .4s;"></div>
+                                    <div id="ap-udm-phone-bar" style="background:#2271b1;height:100%;width:0%;transition:width .4s;"></div>
                                 </div>
-                                <span id="ap-mig-counts" style="display:block;margin-top:4px;font-size:12px;color:#666;">— / —</span>
+                                <span id="ap-udm-phone" style="display:block;margin-top:4px;font-size:12px;color:#666;">— / —</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><?php esc_html_e( 'Email Addresses', 'auth-popup' ); ?></th>
+                            <td>
+                                <div style="background:#ddd;border-radius:4px;height:18px;width:100%;max-width:400px;overflow:hidden;">
+                                    <div id="ap-udm-email-bar" style="background:#2271b1;height:100%;width:0%;transition:width .4s;"></div>
+                                </div>
+                                <span id="ap-udm-email" style="display:block;margin-top:4px;font-size:12px;color:#666;">— / —</span>
                             </td>
                         </tr>
                         <tr>
                             <th><?php esc_html_e( 'Next batch', 'auth-popup' ); ?></th>
-                            <td><span id="ap-mig-next">—</span></td>
+                            <td><span id="ap-udm-next">—</span></td>
                         </tr>
                     </table>
 
-                    <button type="button" class="button button-primary" id="ap-mig-run">
+                    <button type="button" class="button button-primary" id="ap-udm-run">
                         <?php esc_html_e( 'Run Next Batch Now', 'auth-popup' ); ?>
                     </button>
                     &nbsp;
-                    <button type="button" class="button" id="ap-mig-restart">
+                    <button type="button" class="button" id="ap-udm-restart">
                         <?php esc_html_e( 'Restart Migration', 'auth-popup' ); ?>
                     </button>
-                    <span id="ap-mig-msg" style="margin-left:10px;color:#2271b1;font-size:13px;"></span>
+                    <span id="ap-udm-msg" style="margin-left:10px;color:#2271b1;font-size:13px;"></span>
                 </div>
+
             </div>
 
         </div>
@@ -300,86 +312,88 @@
         });
     }
 
-    // ── Migration monitor ───────────────────────────────────────────
-    var migPollTimer = null;
+    // ── Mobile & Email Migration monitor ───────────────────────────
+    var udmPollTimer = null;
 
-    function apMigFetch() {
+    function apUdmFetch() {
         jQuery.post(AuthPopupAdmin.ajaxUrl, {
-            action: 'auth_popup_migration_status',
+            action: 'auth_popup_user_data_mig_status',
             nonce:  AuthPopupAdmin.nonce,
         }, function(res) {
             if (!res.success) return;
             var d = res.data;
 
-            // Status badge
-            var statusEl = document.getElementById('ap-mig-status');
+            var statusEl = document.getElementById('ap-udm-status');
             if (d.done) {
                 statusEl.innerHTML = '<span style="color:#46b450;font-weight:600;">&#10003; Complete</span>';
-                clearInterval(migPollTimer);
+                clearInterval(udmPollTimer);
             } else {
                 statusEl.innerHTML = '<span style="color:#f0a500;font-weight:600;">&#9679; In Progress</span>';
             }
 
-            // Progress bar
-            document.getElementById('ap-mig-bar').style.width = d.percent + '%';
-            document.getElementById('ap-mig-counts').textContent =
-                d.migrated.toLocaleString() + ' / ' + d.total.toLocaleString() +
-                ' (' + d.percent + '%)';
+            var phonePercent = d.phone_total > 0 ? Math.min(100, Math.round(d.phone_migrated / d.phone_total * 100)) : 100;
+            document.getElementById('ap-udm-phone-bar').style.width = phonePercent + '%';
+            document.getElementById('ap-udm-phone').textContent =
+                d.phone_migrated.toLocaleString() + ' / ' + d.phone_total.toLocaleString() + ' synced (' + phonePercent + '%)';
 
-            // Next scheduled run
-            var nextEl = document.getElementById('ap-mig-next');
-            nextEl.textContent = d.next_run ? d.next_run : (d.done ? '—' : 'Not scheduled');
+            var emailPercent = d.email_total > 0 ? Math.min(100, Math.round(d.email_synced / d.email_total * 100)) : 100;
+            document.getElementById('ap-udm-email-bar').style.width = emailPercent + '%';
+            document.getElementById('ap-udm-email').textContent =
+                d.email_synced.toLocaleString() + ' / ' + d.email_total.toLocaleString() + ' synced (' + emailPercent + '%)' +
+                (d.email_remaining > 0 ? ' — ' + d.email_remaining.toLocaleString() + ' remaining' : '');
+            document.getElementById('ap-udm-next').textContent =
+                d.next_run ? d.next_run : (d.done ? '—' : 'Not scheduled');
         });
     }
 
-    function apMigStartPolling() {
-        apMigFetch();
-        clearInterval(migPollTimer);
-        migPollTimer = setInterval(apMigFetch, 4000);
+    function apUdmStartPolling() {
+        apUdmFetch();
+        clearInterval(udmPollTimer);
+        udmPollTimer = setInterval(apUdmFetch, 4000);
     }
 
     // Auto-start polling when Migration tab is opened
     document.querySelectorAll('.nav-tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
             if (this.dataset.tab === 'tab-migration') {
-                apMigStartPolling();
+                apUdmStartPolling();
             } else {
-                clearInterval(migPollTimer);
+                clearInterval(udmPollTimer);
             }
         });
     });
 
     // Run Next Batch Now
-    document.getElementById('ap-mig-run') && document.getElementById('ap-mig-run').addEventListener('click', function() {
+    document.getElementById('ap-udm-run') && document.getElementById('ap-udm-run').addEventListener('click', function() {
         var btn = this;
         btn.disabled = true;
-        document.getElementById('ap-mig-msg').textContent = 'Running batch…';
+        document.getElementById('ap-udm-msg').textContent = 'Running batch…';
         jQuery.post(AuthPopupAdmin.ajaxUrl, {
-            action: 'auth_popup_run_migration',
+            action: 'auth_popup_run_user_data_mig',
             nonce:  AuthPopupAdmin.nonce,
         }, function() {
             btn.disabled = false;
-            document.getElementById('ap-mig-msg').textContent = 'Done. Refreshing…';
-            apMigFetch();
-            setTimeout(function(){ document.getElementById('ap-mig-msg').textContent = ''; }, 3000);
+            document.getElementById('ap-udm-msg').textContent = 'Done. Refreshing…';
+            apUdmFetch();
+            setTimeout(function(){ document.getElementById('ap-udm-msg').textContent = ''; }, 3000);
         });
     });
 
     // Restart Migration
-    document.getElementById('ap-mig-restart') && document.getElementById('ap-mig-restart').addEventListener('click', function() {
-        if (!confirm('This will re-process all billing_phone entries. Continue?')) return;
+    document.getElementById('ap-udm-restart') && document.getElementById('ap-udm-restart').addEventListener('click', function() {
+        if (!confirm('This will re-process all billing_phone and billing_email entries. Continue?')) return;
         var btn = this;
         btn.disabled = true;
-        document.getElementById('ap-mig-msg').textContent = 'Restarting…';
+        document.getElementById('ap-udm-msg').textContent = 'Restarting…';
         jQuery.post(AuthPopupAdmin.ajaxUrl, {
-            action:  'auth_popup_run_migration',
+            action:  'auth_popup_run_user_data_mig',
             nonce:   AuthPopupAdmin.nonce,
             restart: 1,
         }, function() {
             btn.disabled = false;
-            document.getElementById('ap-mig-msg').textContent = 'Restarted. Refreshing…';
-            apMigStartPolling();
-            setTimeout(function(){ document.getElementById('ap-mig-msg').textContent = ''; }, 3000);
+            document.getElementById('ap-udm-msg').textContent = 'Restarted. Refreshing…';
+            apUdmStartPolling();
+            setTimeout(function(){ document.getElementById('ap-udm-msg').textContent = ''; }, 3000);
         });
     });
 })();
