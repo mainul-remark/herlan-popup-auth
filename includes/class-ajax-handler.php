@@ -15,6 +15,8 @@ class Auth_Popup_Ajax_Handler {
             'auth_popup_register',
             'auth_popup_google_auth',
             'auth_popup_facebook_auth',
+            'auth_popup_verify_otp',
+            'auth_popup_social_complete',
             'auth_popup_logout',
             'auth_popup_check_phone',
             'auth_popup_get_loyalty_rules',
@@ -55,6 +57,11 @@ class Auth_Popup_Ajax_Handler {
         // For login: phone must already be registered
         if ( 'login' === $context && null === Auth_Popup_User_Auth::get_user_by_phone( $phone ) ) {
             self::error( __( 'No account found with this mobile number. Please register first.', 'auth-popup' ) );
+        }
+
+        // For social completion: phone must NOT already belong to another account
+        if ( 'social' === $context && null !== Auth_Popup_User_Auth::get_user_by_phone( $phone ) ) {
+            self::error( __( 'This mobile number is already registered. Please use a different number or sign in with your existing account.', 'auth-popup' ) );
         }
 
         // Generate OTP (includes rate-limit check)
@@ -295,14 +302,33 @@ class Auth_Popup_Ajax_Handler {
             self::error( $profile->get_error_message() );
         }
 
-        $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'google' );
-        if ( is_wp_error( $user ) ) {
-            self::error( $user->get_error_message() );
+        // If the OAuth profile contains a phone number, try to auto-login
+        $phone = isset( $profile['phone'] ) ? Auth_Popup_SMS_Service::normalise_phone( $profile['phone'] ) : '';
+        if ( $phone && Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
+            $user_by_phone = Auth_Popup_User_Auth::get_user_by_phone( $phone );
+            if ( $user_by_phone ) {
+                // Phone matched an existing account — auto-login
+                $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'google' );
+                if ( is_wp_error( $user ) ) {
+                    self::error( $user->get_error_message() );
+                }
+                self::success( [
+                    'message'  => __( 'Logged in with Google!', 'auth-popup' ),
+                    'redirect' => self::redirect_url(),
+                ] );
+            }
         }
 
+        // No usable phone or no matching account — require mobile verification
+        $temp_token = wp_generate_password( 32, false );
+        set_transient( 'ap_social_' . $temp_token, [ 'profile' => $profile, 'provider' => 'google' ], 15 * MINUTE_IN_SECONDS );
+
         self::success( [
-            'message'  => __( 'Logged in with Google!', 'auth-popup' ),
-            'redirect' => self::redirect_url(),
+            'need_mobile' => true,
+            'temp_token'  => $temp_token,
+            'provider'    => 'google',
+            'name'        => $profile['name'] ?? '',
+            'message'     => __( 'Please verify your mobile number to complete sign-in.', 'auth-popup' ),
         ] );
     }
 
@@ -322,13 +348,123 @@ class Auth_Popup_Ajax_Handler {
             self::error( $profile->get_error_message() );
         }
 
-        $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'facebook' );
+        // If the OAuth profile contains a phone number, try to auto-login
+        $phone = isset( $profile['phone'] ) ? Auth_Popup_SMS_Service::normalise_phone( $profile['phone'] ) : '';
+        if ( $phone && Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
+            $user_by_phone = Auth_Popup_User_Auth::get_user_by_phone( $phone );
+            if ( $user_by_phone ) {
+                // Phone matched an existing account — auto-login
+                $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'facebook' );
+                if ( is_wp_error( $user ) ) {
+                    self::error( $user->get_error_message() );
+                }
+                self::success( [
+                    'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
+                    'redirect' => self::redirect_url(),
+                ] );
+            }
+        }
+
+        // No usable phone or no matching account — require mobile verification
+        $temp_token = wp_generate_password( 32, false );
+        set_transient( 'ap_social_' . $temp_token, [ 'profile' => $profile, 'provider' => 'facebook' ], 15 * MINUTE_IN_SECONDS );
+
+        self::success( [
+            'need_mobile' => true,
+            'temp_token'  => $temp_token,
+            'provider'    => 'facebook',
+            'name'        => $profile['name'] ?? '',
+            'message'     => __( 'Please verify your mobile number to complete sign-in.', 'auth-popup' ),
+        ] );
+    }
+
+    /* ── OTP Peek (verify without consuming) ───────────────────────── */
+
+    public static function auth_popup_verify_otp(): void {
+        self::verify_nonce();
+
+        $phone = sanitize_text_field( $_POST['phone'] ?? '' );
+        $otp   = sanitize_text_field( $_POST['otp']   ?? '' );
+
+        if ( ! Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
+            self::error( __( 'Invalid mobile number.', 'auth-popup' ) );
+        }
+
+        if ( strlen( $otp ) !== 6 || ! ctype_digit( $otp ) ) {
+            self::error( __( 'Invalid OTP format.', 'auth-popup' ) );
+        }
+
+        $norm = Auth_Popup_SMS_Service::normalise_phone( $phone );
+
+        if ( ! Auth_Popup_OTP_Manager::peek( $norm, $otp ) ) {
+            self::error( __( 'Incorrect or expired OTP. Please try again.', 'auth-popup' ) );
+        }
+
+        self::success( [ 'message' => __( 'OTP verified.', 'auth-popup' ) ] );
+    }
+
+    /* ── Social Login Completion (mobile + OTP) ─────────────────────── */
+
+    public static function auth_popup_social_complete(): void {
+        self::verify_nonce();
+
+        if ( is_user_logged_in() ) {
+            self::success( [ 'redirect' => self::redirect_url() ] );
+        }
+
+        $temp_token = sanitize_text_field( $_POST['temp_token'] ?? '' );
+        $phone      = sanitize_text_field( $_POST['phone']      ?? '' );
+        $otp        = sanitize_text_field( $_POST['otp']        ?? '' );
+
+        if ( empty( $temp_token ) ) {
+            self::error( __( 'Session expired. Please try signing in again.', 'auth-popup' ) );
+        }
+
+        $transient = get_transient( 'ap_social_' . $temp_token );
+        if ( ! $transient ) {
+            self::error( __( 'Session expired. Please try signing in again.', 'auth-popup' ) );
+        }
+
+        $profile  = $transient['profile'];
+        $provider = $transient['provider'];
+
+        if ( ! Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
+            self::error( __( 'Invalid mobile number.', 'auth-popup' ) );
+        }
+
+        if ( strlen( $otp ) !== 6 || ! ctype_digit( $otp ) ) {
+            self::error( __( 'Invalid OTP format.', 'auth-popup' ) );
+        }
+
+        $norm = Auth_Popup_SMS_Service::normalise_phone( $phone );
+
+        if ( ! Auth_Popup_OTP_Manager::verify( $norm, $otp ) ) {
+            self::error( __( 'Incorrect or expired OTP. Please try again.', 'auth-popup' ) );
+        }
+
+        // OTP verified — consume the session transient
+        delete_transient( 'ap_social_' . $temp_token );
+
+        $user = Auth_Popup_User_Auth::login_or_create_social_with_phone( $profile, $provider, $norm );
         if ( is_wp_error( $user ) ) {
             self::error( $user->get_error_message() );
         }
 
+        // Optional: Herlan Star Loyalty registration
+        $loyalty_message = '';
+        if ( ! empty( $_POST['join_loyalty'] ) && '1' === $_POST['join_loyalty'] ) {
+            $name  = sanitize_text_field( $profile['name']  ?? '' );
+            $email = sanitize_email( $profile['email'] ?? '' );
+            $loyalty_message = self::register_loyalty( $user, $name, $email, $norm );
+        }
+
+        $message = __( 'Signed in successfully!', 'auth-popup' );
+        if ( $loyalty_message ) {
+            $message .= ' ' . $loyalty_message;
+        }
+
         self::success( [
-            'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
+            'message'  => $message,
             'redirect' => self::redirect_url(),
         ] );
     }

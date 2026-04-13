@@ -42,6 +42,7 @@
             this.bindHeaderBack();
             this.initGoogle();
             this.initFacebook();
+            this.initSocialComplete();
             this.initCheckout();
             this.loadLoyaltyRules();
             this.initDatepicker();
@@ -199,9 +200,8 @@
         },
 
         getPhoneFromForm(form) {
-            if (form === 'login') {
-                return $('#ap-lo-phone').val().trim();
-            }
+            if (form === 'login')   return $('#ap-lo-phone').val().trim();
+            if (form === 'social')  return $('#ap-sc-phone').val().trim();
             return $('#ap-reg-phone').val().trim();
         },
 
@@ -343,13 +343,16 @@
                 url:    AuthPopup.ajaxUrl,
                 method: 'POST',
                 data: {
-                    action: 'auth_popup_send_otp',
-                    nonce:  AuthPopup.nonce,
-                    phone:  phone,
+                    action:  'auth_popup_send_otp',
+                    nonce:   AuthPopup.nonce,
+                    phone:   phone,
+                    context: form,
                 },
                 success: (res) => {
                     if (res.success) {
-                        const formSel = form === 'login' ? '#ap-login-otp-form' : '#ap-register-form';
+                        let formSel = '#ap-register-form';
+                        if (form === 'login')  formSel = '#ap-login-otp-form';
+                        if (form === 'social') formSel = '#ap-sc-otp-section';
                         this.startTimer(form, res.data.expiry_seconds || 300, formSel);
                         this.showAlert('success', res.data.message);
                     } else {
@@ -578,8 +581,12 @@
                                 success: (res) => {
                                     $btns.removeClass('ap-loading').prop('disabled', false);
                                     if (res.success) {
-                                        this.showAlert('success', res.data.message);
-                                        setTimeout(() => { window.location.href = res.data.redirect || AuthPopup.redirectUrl; }, 600);
+                                        if (res.data.need_mobile) {
+                                            this.showSocialCompletePanel(res.data);
+                                        } else {
+                                            this.showAlert('success', res.data.message);
+                                            setTimeout(() => { window.location.href = res.data.redirect || AuthPopup.redirectUrl; }, 600);
+                                        }
                                     } else {
                                         this.showAlert('error', res.data.message);
                                     }
@@ -656,8 +663,12 @@
                     success: (res) => {
                         $btns.removeClass('ap-loading').prop('disabled', false);
                         if (res.success) {
-                            this.showAlert('success', res.data.message);
-                            setTimeout(() => { window.location.href = res.data.redirect || AuthPopup.redirectUrl; }, 600);
+                            if (res.data.need_mobile) {
+                                this.showSocialCompletePanel(res.data);
+                            } else {
+                                this.showAlert('success', res.data.message);
+                                setTimeout(() => { window.location.href = res.data.redirect || AuthPopup.redirectUrl; }, 600);
+                            }
                         } else {
                             this.showAlert('error', res.data.message);
                         }
@@ -860,14 +871,17 @@
             const maxDate = new Date();
             maxDate.setFullYear(maxDate.getFullYear() - 10);
 
-            $('#ap-reg-dob').datepicker({
+            const dpOpts = {
                 dateFormat:  'yy-mm-dd',
                 maxDate:     maxDate,
                 changeMonth: true,
                 changeYear:  true,
                 yearRange:   '1940:' + (new Date().getFullYear() - 10),
                 showAnim:    'fadeIn',
-            });
+            };
+
+            $('#ap-reg-dob').datepicker(dpOpts);
+            $('#ap-sc-dob').datepicker(dpOpts);
         },
 
         /* ── Loyalty Rules table ─────────────────────────────────────── */
@@ -921,6 +935,278 @@
                     $tbody.find('.ap-rule-hidden').removeClass('ap-rule-hidden');
                     $btn.addClass('ap-expanded').html('View Less ' + viewLessSvg);
                 }
+            });
+        },
+
+        /* ── Social Login Completion panel ──────────────────────────── */
+
+        /**
+         * Switch the popup to the social-complete panel and pre-populate it.
+         * Called when Google/Facebook OAuth returns need_mobile:true.
+         */
+        showSocialCompletePanel(data) {
+            // Hide all panels, show the social-complete one
+            this.$overlay.find('.ap-panel').removeClass('active');
+            $('#ap-panel-social-complete').addClass('active');
+
+            // Store the temp token so it's submitted with the form
+            $('#ap-sc-temp-token').val(data.temp_token || '');
+
+            // Update heading with provider name and user's OAuth name
+            const providerName = data.provider === 'google' ? 'Google' : 'Facebook';
+            $('#ap-sc-title').text('Complete ' + providerName + ' Sign-in');
+            if (data.name) {
+                $('#ap-sc-subtitle').text(
+                    'Hi ' + data.name + '! Please verify your mobile number to complete sign-in.'
+                );
+            } else {
+                $('#ap-sc-subtitle').text('Please verify your mobile number to complete sign-in.');
+            }
+
+            // Reset: show only phase 1 (phone input)
+            $('#ap-sc-phone-section').show();
+            $('#ap-sc-otp-section').hide();
+            $('#ap-sc-loyalty-section').hide();
+            $('#ap-sc-phone').val('');
+            $('#ap-sc-phone-msg').text('').removeClass('taken free error');
+            $('#ap-sc-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+            $('#ap-sc-otp').val('');
+            this.clearTimer('social');
+            this.clearAlert();
+            this.$dialog.scrollTop(0);
+        },
+
+        // Returns true if phone matches Bangladeshi format: 01[3-9]XXXXXXXX (11 digits)
+        isValidBDPhone(phone) {
+            return /^01[3-9]\d{8}$/.test(phone);
+        },
+
+        initSocialComplete() {
+            // Phase 1: blur validation on phone field
+            this.$overlay.on('blur', '#ap-sc-phone', () => {
+                const phone = $('#ap-sc-phone').val().trim();
+                const $msg  = $('#ap-sc-phone-msg');
+
+                $msg.text('').removeClass('taken free error');
+
+                if (!phone) return;
+
+                if (!this.isValidBDPhone(phone)) {
+                    $msg.text('Please enter a valid Bangladeshi mobile number (e.g. 01712345678).').addClass('error');
+                    return;
+                }
+
+                // Check if this number is already linked to an account
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data:   { action: 'auth_popup_check_phone', nonce: AuthPopup.nonce, phone },
+                    success: (res) => {
+                        if (!res.success || !res.data.valid) return;
+                        if (res.data.exists) {
+                            $msg.text('This mobile number is already registered. Please use a different number or sign in with your existing account.').addClass('taken');
+                            $('#ap-sc-send-otp-btn').prop('disabled', true);
+                        } else {
+                            $msg.text('Mobile number is available.').addClass('free');
+                            $('#ap-sc-send-otp-btn').prop('disabled', false);
+                        }
+                    },
+                });
+            });
+
+            // Clear message and re-enable button while user is typing
+            this.$overlay.on('input', '#ap-sc-phone', () => {
+                $('#ap-sc-phone-msg').text('').removeClass('taken free error');
+                $('#ap-sc-send-otp-btn').prop('disabled', false);
+            });
+
+            // Phase 1 → 2: Send OTP
+            this.$overlay.on('click', '#ap-sc-send-otp-btn', () => {
+                const phone = $('#ap-sc-phone').val().trim();
+                const $msg  = $('#ap-sc-phone-msg');
+
+                $msg.text('').removeClass('taken free error');
+
+                if (!phone) {
+                    $msg.text('Please enter your mobile number.').addClass('error');
+                    return;
+                }
+                if (!this.isValidBDPhone(phone)) {
+                    $msg.text('Please enter a valid Bangladeshi mobile number (e.g. 01712345678).').addClass('error');
+                    return;
+                }
+
+                const $btn = $('#ap-sc-send-otp-btn');
+                $btn.addClass('ap-loading').prop('disabled', true);
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action:  'auth_popup_send_otp',
+                        nonce:   AuthPopup.nonce,
+                        phone:   phone,
+                        context: 'social',
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            // Update subtitle for phase 2
+                            $('#ap-sc-subtitle').text(
+                                'Enter the 6-digit OTP sent to +880' + phone.slice(1) + '.'
+                            );
+                            // Show OTP section, hide phone section
+                            $('#ap-sc-phone-section').hide();
+                            $('#ap-sc-otp-section').show();
+                            $('#ap-sc-otp-hint').text(
+                                this.i18n('OTP sent to') + ' *****' + phone.slice(-4)
+                            );
+                            this.startTimer('social', res.data.expiry_seconds || 300, '#ap-sc-otp-section');
+                            $('#ap-sc-otp-inputs .ap-otp-digit').first().focus();
+                            this.clearAlert();
+                        } else {
+                            // Show backend error under the phone field
+                            $('#ap-sc-phone-msg').text(res.data.message || this.i18n('Failed to send OTP.')).addClass('taken');
+                            $('#ap-sc-send-otp-btn').prop('disabled', true);
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
+            });
+
+            // Phase 2: Verify OTP server-side → reveal phase 3 (loyalty + submit)
+            this.$overlay.on('click', '#ap-sc-verify-otp-btn', () => {
+                const otp   = $('#ap-sc-otp').val();
+                const phone = $('#ap-sc-phone').val().trim();
+
+                if (!otp || otp.length !== 6) {
+                    this.showAlert('error', this.i18n('Please enter the 6-digit OTP.'));
+                    return;
+                }
+
+                const $btn = $('#ap-sc-verify-otp-btn');
+                $btn.addClass('ap-loading').prop('disabled', true);
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_verify_otp',
+                        nonce:  AuthPopup.nonce,
+                        phone:  phone,
+                        otp:    otp,
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            // Update subtitle for phase 3
+                            $('#ap-sc-subtitle').text(
+                                'Join the Herlan Star Member Program today and unlock exclusive discounts, exciting bonuses, and special rewards every time you shop.'
+                            );
+                            $('#ap-sc-otp-section').hide();
+                            $('#ap-sc-loyalty-section').show();
+                            this.clearAlert();
+                            this.$dialog.scrollTop(0);
+                            this.loadSocialLoyaltyRules();
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
+            });
+
+            // Phase 2 back: return to phone input
+            this.$overlay.on('click', '#ap-sc-back-btn', () => {
+                // Restore phase 1 subtitle
+                $('#ap-sc-subtitle').text('Please verify your mobile number to complete sign-in.');
+                $('#ap-sc-otp-section').hide();
+                $('#ap-sc-phone-section').show();
+                $('#ap-sc-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+                $('#ap-sc-otp').val('');
+                this.clearTimer('social');
+                this.clearAlert();
+            });
+
+            // Loyalty Programme toggle (phase 3)
+            this.$overlay.on('change', '#ap-sc-join-loyalty', function () {
+                const $loyaltyFields = $('#ap-sc-loyalty-fields');
+                if ($(this).is(':checked')) {
+                    $('#ap-sc-loyalty-benefits').hide();
+                    $loyaltyFields.slideDown(220);
+                } else {
+                    $loyaltyFields.slideUp(180);
+                    $('#ap-sc-loyalty-benefits').show();
+                    $loyaltyFields.find('select[name="gender"]').val('');
+                    $loyaltyFields.find('input[name="dob"]').val('');
+                }
+            });
+
+            // Form submission (phase 3)
+            this.$overlay.on('submit', '#ap-social-complete-form', (e) => {
+                e.preventDefault();
+                if (!this.validateSocialLoyaltyFields()) return;
+                this.submitForm($(e.currentTarget), 'auth_popup_social_complete');
+            });
+        },
+
+        validateSocialLoyaltyFields() {
+            const $checkbox = this.$overlay.find('#ap-sc-join-loyalty');
+            if (!$checkbox.is(':checked')) return true;
+
+            const gender = this.$overlay.find('#ap-sc-gender').val();
+            const dob    = this.$overlay.find('#ap-sc-dob').val();
+
+            if (!gender) {
+                this.showAlert('error', this.i18n('Please select your gender to join the Loyalty Programme.'));
+                this.$overlay.find('#ap-sc-gender').focus();
+                return false;
+            }
+            if (!dob) {
+                this.showAlert('error', this.i18n('Please enter your date of birth to join the Loyalty Programme.'));
+                this.$overlay.find('#ap-sc-dob').focus();
+                return false;
+            }
+            return true;
+        },
+
+        loadSocialLoyaltyRules() {
+            const $tbody = $('#ap-sc-loyalty-rules-tbody');
+            if (!$tbody.length || $tbody.data('ap-loaded')) return;
+
+            $.ajax({
+                url:    AuthPopup.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action: 'auth_popup_get_loyalty_rules',
+                    nonce:  AuthPopup.nonce,
+                },
+                success: (res) => {
+                    if (!res.success || !res.data.rules || !res.data.rules.length) {
+                        $tbody.html('<tr><td colspan="3" class="ap-rule-empty">No rules found.</td></tr>');
+                        return;
+                    }
+                    let html = '';
+                    res.data.rules.forEach((rule, i) => {
+                        html += '<tr class="ap-rule-row">'
+                            + '<td class="ap-col-num">' + (i + 1) + '</td>'
+                            + '<td>' + $('<div>').text(rule.name).html() + '</td>'
+                            + '<td>' + $('<div>').text(rule.description).html() + '</td>'
+                            + '</tr>';
+                    });
+                    $tbody.html(html).data('ap-loaded', true);
+                },
+                error: () => {
+                    $tbody.html('<tr><td colspan="3" class="ap-rule-empty">Failed to load rules.</td></tr>');
+                },
             });
         },
 

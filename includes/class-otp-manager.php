@@ -58,6 +58,18 @@ class Auth_Popup_OTP_Manager {
     }
 
     /**
+     * Check an OTP without consuming it (transient is kept).
+     * Use this for intermediate validation steps; call verify() on final submit.
+     */
+    public static function peek( string $phone, string $otp ): bool {
+        $stored = get_transient( self::transient_key( $phone ) );
+        if ( false === $stored ) {
+            return false;
+        }
+        return hash_equals( $stored, wp_hash( $otp ) );
+    }
+
+    /**
      * Delete (invalidate) an OTP manually.
      */
     public static function invalidate( string $phone ): void {

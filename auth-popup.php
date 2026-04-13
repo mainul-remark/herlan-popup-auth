@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AUTH_POPUP_VERSION',  '1.0.0' );
+define( 'AUTH_POPUP_VERSION',  '1.0.4' );
 define( 'AUTH_POPUP_FILE',     __FILE__ );
 define( 'AUTH_POPUP_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'AUTH_POPUP_URL',      plugin_dir_url( __FILE__ ) );

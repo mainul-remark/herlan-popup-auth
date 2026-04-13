@@ -178,6 +178,68 @@ class Auth_Popup_User_Auth {
         return self::do_login( $user );
     }
 
+    /* ── Social login + phone completion ───────────────────────────── */
+
+    /**
+     * Find or create a user from a verified OAuth profile combined with a
+     * phone number that has already been OTP-verified by the caller.
+     *
+     * Priority: phone match → email match → create new user.
+     *
+     * @param array  $profile  ['email', 'name', 'avatar', 'provider_id']
+     * @param string $provider 'google' | 'facebook'
+     * @param string $phone    Normalised phone number (already OTP-verified)
+     * @return WP_User|WP_Error
+     */
+    public static function login_or_create_social_with_phone( array $profile, string $provider, string $phone ) {
+        $email       = sanitize_email( $profile['email'] ?? '' );
+        $name        = sanitize_text_field( $profile['name'] ?? '' );
+        $provider_id = sanitize_text_field( $profile['provider_id'] ?? '' );
+        $avatar      = esc_url_raw( $profile['avatar'] ?? '' );
+
+        // 1. Try to find existing user by the OTP-verified phone
+        $user = self::get_user_by_phone( $phone );
+
+        // 2. Fall back to lookup by OAuth email
+        if ( ! $user && ! empty( $email ) ) {
+            $user = get_user_by( 'email', $email );
+        }
+
+        // 3. Create a brand-new user
+        if ( ! $user ) {
+            $username = self::generate_username( $name ?: $email );
+            $user_id  = wp_insert_user( [
+                'user_login'   => $username,
+                'user_pass'    => wp_generate_password( 24 ),
+                'user_email'   => $email ?: '',
+                'first_name'   => self::parse_first_name( $name ),
+                'last_name'    => self::parse_last_name( $name ),
+                'display_name' => $name ?: ( 'User ' . substr( $phone, -4 ) ),
+                'role'         => 'customer',
+            ] );
+
+            if ( is_wp_error( $user_id ) ) {
+                return $user_id;
+            }
+
+            $user = get_user_by( 'ID', $user_id );
+            wp_new_user_notification( $user_id, null, 'user' );
+        }
+
+        // Store / update the verified phone on the account
+        self::upsert_profile( $user->ID, [ 'phone' => $phone ] );
+        update_user_meta( $user->ID, 'billing_phone', $phone );
+
+        // Store / update OAuth provider data
+        $profile_data = [ "{$provider}_id" => $provider_id ];
+        if ( $avatar ) {
+            $profile_data["{$provider}_avatar"] = $avatar;
+        }
+        self::upsert_profile( $user->ID, $profile_data );
+
+        return self::do_login( $user );
+    }
+
     /* ── Private helpers ────────────────────────────────────────────── */
 
     private static function do_login( WP_User $user ) {
