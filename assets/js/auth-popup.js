@@ -807,6 +807,9 @@
 
             const isMobile = () => window.innerWidth <= 768;
 
+            // History stack: [{url, title}, ...] — index 0 is the root page
+            const navHistory = [];
+
             const openModal = (url, title) => {
                 $('#ap-acct-modal-title').text(title || 'My Account');
                 $('#ap-acct-modal-body').html(
@@ -814,6 +817,8 @@
                 );
                 $('#ap-acct-modal').addClass('open');
                 $('body').addClass('ap-no-scroll');
+                // Show back-arrow only when we're deeper than the root page
+                $('#ap-acct-modal-back').toggleClass('ap-modal-can-go-back', navHistory.length > 1);
 
                 fetch(url, { credentials: 'same-origin' })
                     .then((r) => {
@@ -834,7 +839,13 @@
                     });
             };
 
+            const navigateTo = (url, title) => {
+                navHistory.push({ url, title });
+                openModal(url, title);
+            };
+
             const closeModal = () => {
+                navHistory.length = 0;
                 $('#ap-acct-modal').removeClass('open');
                 $('body').removeClass('ap-no-scroll');
             };
@@ -852,15 +863,72 @@
                     return;
                 }
                 e.preventDefault();
-                openModal(href, $a.text().trim());
+                navHistory.length = 0; // Reset history for new top-level nav
+                navigateTo(href, $a.text().trim());
             });
 
-            // Close modal (back or × button)
-            $(document).on('click', '#ap-acct-modal-back, #ap-acct-modal-close', closeModal);
+            // Back button: go to previous in-modal page, or close if at root
+            $(document).on('click', '#ap-acct-modal-back', () => {
+                if (navHistory.length > 1) {
+                    navHistory.pop();
+                    const prev = navHistory[navHistory.length - 1];
+                    openModal(prev.url, prev.title);
+                } else {
+                    closeModal();
+                }
+            });
+
+            // × button always closes
+            $(document).on('click', '#ap-acct-modal-close', closeModal);
 
             // ESC key
             $(document).on('keydown.acct', (e) => {
                 if (e.key === 'Escape' && $('#ap-acct-modal').hasClass('open')) closeModal();
+            });
+
+            // Links inside the modal body → intercept my-account sub-page links
+            // so View / Invoice / etc. load within the modal instead of navigating away.
+            const myAccBase = (AuthPopup.myAccountUrl || '').replace(/\/$/, '');
+            $(document).on('click', '#ap-acct-modal-body a', (e) => {
+                if (!isMobile()) return;
+                const $a   = $(e.currentTarget);
+                const href = $a.attr('href') || '';
+
+                // Let these navigate normally: empty, hash, logout, javascript:,
+                // existing new-tab links, and download links.
+                if (
+                    !href ||
+                    href.startsWith('#') ||
+                    href.indexOf('customer-logout') !== -1 ||
+                    href.startsWith('javascript:') ||
+                    $a.attr('target') === '_blank' ||
+                    $a.attr('download') != null
+                ) return;
+
+                // PDF invoice links (WooCommerce PDF Invoices & Packing Slips plugin).
+                // The plugin normally adds target="_blank" on page load, but that JS
+                // won't re-run on AJAX-loaded modal content, so we force a new tab here.
+                if ( href.indexOf('generate_wpo_wcpdf') !== -1 ) {
+                    e.preventDefault();
+                    window.open( href, '_blank' );
+                    return;
+                }
+
+                // Intercept only same-origin my-account sub-pages
+                // (e.g. /my-account/view-order/123/).
+                // Invoice PDF links or other-domain links fall through and
+                // navigate normally.
+                const isSameOrigin = href.startsWith('/') ||
+                    href.startsWith(window.location.origin);
+                const isMyAccSub   = isSameOrigin && myAccBase &&
+                    href.replace(/\/$/, '') !== myAccBase &&
+                    (href.indexOf('/my-account/') !== -1 ||
+                     (myAccBase && href.indexOf(myAccBase + '/') !== -1));
+
+                if (isMyAccSub) {
+                    e.preventDefault();
+                    navigateTo(href, $a.text().trim() || 'My Account');
+                }
             });
         },
 

@@ -3,7 +3,7 @@
  * Plugin Name: Auth Popup
  * Plugin URI:  https://herlan.com/auth-popup
  * Description: SAAS-ready WordPress popup authentication — OTP via SSLCommerce iSMS Plus, Google OAuth, Facebook OAuth. All AJAX-driven.
- * Version:     1.0.0
+ * Version:     1.0.6
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Author:      Herlan
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AUTH_POPUP_VERSION',  '1.0.5' );
+define( 'AUTH_POPUP_VERSION',  '1.0.6' );
 define( 'AUTH_POPUP_FILE',     __FILE__ );
 define( 'AUTH_POPUP_PATH',     plugin_dir_path( __FILE__ ) );
 define( 'AUTH_POPUP_URL',      plugin_dir_url( __FILE__ ) );

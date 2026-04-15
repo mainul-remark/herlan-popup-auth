@@ -1112,4 +1112,7 @@
 }
 #ap-sc-title {margin-top: 20px!important; font-size: 22px!important;}
 #ap-close-btn {border: 0px!important;}
+.ap-acct-modal-body a:has(.fa-reply) {
+    display: none!important;
+}
 /*custom css codes ends*/
