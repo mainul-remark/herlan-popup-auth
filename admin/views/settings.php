@@ -58,8 +58,25 @@
                         <td><input type="number" name="auth_popup_settings[otp_expiry_minutes]" value="<?php echo absint( $s['otp_expiry_minutes'] ); ?>" min="1" max="30" class="small-text"></td>
                     </tr>
                     <tr>
-                        <th><?php esc_html_e( 'Max OTP requests / hour', 'auth-popup' ); ?></th>
-                        <td><input type="number" name="auth_popup_settings[otp_max_per_hour]" value="<?php echo absint( $s['otp_max_per_hour'] ); ?>" min="1" max="20" class="small-text"></td>
+                        <th><?php esc_html_e( 'Max OTP requests / hour (per phone)', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[otp_max_per_hour]" value="<?php echo absint( $s['otp_max_per_hour'] ); ?>" min="1" max="20" class="small-text">
+                            <p class="description"><?php esc_html_e( 'Maximum OTP sends allowed per phone number per hour.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Max OTP requests / hour (per IP)', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[otp_max_per_hour_ip]" value="<?php echo absint( $s['otp_max_per_hour_ip'] ?? 10 ); ?>" min="1" max="50" class="small-text">
+                            <p class="description"><?php esc_html_e( 'Maximum OTP sends allowed from a single IP address per hour (across all phone numbers). Prevents mass-enumeration attacks.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Max OTP verification attempts', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[otp_max_verify_attempts]" value="<?php echo absint( $s['otp_max_verify_attempts'] ?? 5 ); ?>" min="1" max="10" class="small-text">
+                            <p class="description"><?php esc_html_e( 'Maximum wrong OTP guesses allowed before the OTP is invalidated. Prevents brute-force guessing.', 'auth-popup' ); ?></p>
+                        </td>
                     </tr>
                 </table>
             </div>

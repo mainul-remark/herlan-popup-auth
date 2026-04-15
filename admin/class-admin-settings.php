@@ -64,6 +64,8 @@ class Auth_Popup_Admin_Settings {
                     break;
                 case 'otp_expiry_minutes':
                 case 'otp_max_per_hour':
+                case 'otp_max_per_hour_ip':
+                case 'otp_max_verify_attempts':
                     $clean[ $key ] = absint( $value );
                     break;
                 case 'enable_password_login':

@@ -243,6 +243,16 @@ class Auth_Popup_User_Auth {
     /* ── Private helpers ────────────────────────────────────────────── */
 
     private static function do_login( WP_User $user ) {
+        // Run authenticate filters so third-party security plugins (Wordfence, WP Cerber,
+        // etc.) and multisite spam checks can block suspended or banned accounts.
+        // Passing an existing WP_User object causes WordPress's own password-check filters
+        // to bail out immediately (they only act when the first arg is null), so we get
+        // plugin-level blocking without re-running credential verification.
+        $authed = apply_filters( 'authenticate', $user, $user->user_login, '' );
+        if ( is_wp_error( $authed ) ) {
+            return $authed;
+        }
+
         wp_set_current_user( $user->ID );
         wp_set_auth_cookie( $user->ID, true );
         do_action( 'wp_login', $user->user_login, $user );

@@ -45,6 +45,12 @@ class Auth_Popup_Core {
             }
         }
 
+        // Daily cleanup of old OTP log entries
+        add_action( 'auth_popup_cleanup_otp_logs', [ 'Auth_Popup_OTP_Manager', 'cleanup_old_logs' ] );
+        if ( ! wp_next_scheduled( 'auth_popup_cleanup_otp_logs' ) ) {
+            wp_schedule_event( time(), 'daily', 'auth_popup_cleanup_otp_logs' );
+        }
+
         // Boot modules
         Auth_Popup_Ajax_Handler::init();
         Auth_Popup_Admin_Settings::init();
@@ -64,6 +70,11 @@ class Auth_Popup_Core {
     public static function activate(): void {
         self::create_tables();
 
+        // Schedule daily OTP log cleanup
+        if ( ! wp_next_scheduled( 'auth_popup_cleanup_otp_logs' ) ) {
+            wp_schedule_event( time(), 'daily', 'auth_popup_cleanup_otp_logs' );
+        }
+
         // Set default options if not present
         if ( ! get_option( 'auth_popup_settings' ) ) {
             update_option( 'auth_popup_settings', self::default_settings() );
@@ -81,6 +92,7 @@ class Auth_Popup_Core {
     }
 
     public static function deactivate(): void {
+        wp_clear_scheduled_hook( 'auth_popup_cleanup_otp_logs' );
         flush_rewrite_rules();
     }
 
@@ -589,8 +601,10 @@ class Auth_Popup_Core {
             // General
             'redirect_url'          => home_url(),
             'trigger_selector'      => '.auth-popup-trigger',
-            'otp_expiry_minutes'    => 5,
-            'otp_max_per_hour'      => 5,
+            'otp_expiry_minutes'      => 5,
+            'otp_max_per_hour'        => 5,
+            'otp_max_per_hour_ip'     => 10,
+            'otp_max_verify_attempts' => 5,
             'enable_password_login' => '1',
             'enable_otp_login'      => '1',
             'enable_google'         => '1',

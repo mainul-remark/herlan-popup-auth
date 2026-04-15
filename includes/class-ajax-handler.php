@@ -105,10 +105,17 @@ class Auth_Popup_Ajax_Handler {
             self::error( __( 'Mobile/email and password are required.', 'auth-popup' ) );
         }
 
+        // Rate limiting: block before attempting login
+        self::check_password_rate_limit( $credential );
+
         $user = Auth_Popup_User_Auth::login_with_password( $credential, $password );
         if ( is_wp_error( $user ) ) {
+            self::record_password_failure( $credential );
             self::error( $user->get_error_message() );
         }
+
+        // Successful login: clear failure counters for this IP and credential
+        self::clear_password_failures( $credential );
 
         self::success( [
             'message'  => __( 'Login successful!', 'auth-popup' ),
@@ -621,6 +628,59 @@ class Auth_Popup_Ajax_Handler {
         ] );
     }
 
+    /* ── Password Login Rate Limiting ───────────────────────────────── */
+
+    /**
+     * Transient key for per-IP failure counter.
+     * wp_hash() uses HMAC-SHA256 with WP's secret key — key names are unpredictable,
+     * preventing an attacker from targeting specific transient rows in the cache.
+     */
+    private static function pw_ip_key(): string {
+        $ip = Auth_Popup_OTP_Manager::get_client_ip() ?: 'unknown';
+        return 'ap_pw_ip_' . wp_hash( $ip );
+    }
+
+    /**
+     * Transient key for per-credential failure counter.
+     * Catches distributed attacks that rotate IPs but target the same account.
+     */
+    private static function pw_cred_key( string $credential ): string {
+        return 'ap_pw_cr_' . wp_hash( strtolower( $credential ) );
+    }
+
+    /**
+     * Block the request if either the IP or the credential has too many recent failures.
+     * Limits are intentionally different: IPs can legitimately serve many users,
+     * so the IP limit is higher than the per-credential limit.
+     */
+    private static function check_password_rate_limit( string $credential ): void {
+        $window = 15 * MINUTE_IN_SECONDS;
+
+        if ( (int) get_transient( self::pw_ip_key() ) >= 10 ) {
+            self::error( __( 'Too many login attempts from your network. Please try again in 15 minutes.', 'auth-popup' ), 429 );
+        }
+
+        if ( (int) get_transient( self::pw_cred_key( $credential ) ) >= 5 ) {
+            self::error( __( 'Too many login attempts for this account. Please try again in 15 minutes.', 'auth-popup' ), 429 );
+        }
+    }
+
+    /** Increment both failure counters after a wrong password. */
+    private static function record_password_failure( string $credential ): void {
+        $window   = 15 * MINUTE_IN_SECONDS;
+        $ip_key   = self::pw_ip_key();
+        $cred_key = self::pw_cred_key( $credential );
+
+        set_transient( $ip_key,   (int) get_transient( $ip_key )   + 1, $window );
+        set_transient( $cred_key, (int) get_transient( $cred_key ) + 1, $window );
+    }
+
+    /** Reset both counters after a successful login. */
+    private static function clear_password_failures( string $credential ): void {
+        delete_transient( self::pw_ip_key() );
+        delete_transient( self::pw_cred_key( $credential ) );
+    }
+
     /* ── Helpers ─────────────────────────────────────────────────────── */
 
     private static function require_login(): void {
@@ -636,15 +696,22 @@ class Auth_Popup_Ajax_Handler {
     }
 
     private static function redirect_url(): string {
-        $url = sanitize_url( $_POST['redirect_to'] ?? '' );
-        if ( empty( $url ) ) {
-            $url = Auth_Popup_Core::get_setting( 'redirect_url', home_url() );
+        $home      = home_url();
+        $home_host = (string) wp_parse_url( $home, PHP_URL_HOST );
+
+        // Use the caller-supplied URL only if it belongs to the same host.
+        // strpos() is intentionally NOT used here: "https://herlan.com.evil.com/"
+        // starts with "https://herlan.com" and would bypass a prefix check.
+        $url      = sanitize_url( $_POST['redirect_to'] ?? '' );
+        $url_host = ! empty( $url ) ? (string) wp_parse_url( $url, PHP_URL_HOST ) : '';
+
+        if ( ! empty( $url_host ) && $url_host === $home_host ) {
+            return $url;
         }
-        // Prevent open redirect: allow only same-origin URLs
-        if ( strpos( $url, home_url() ) !== 0 ) {
-            $url = home_url();
-        }
-        return $url;
+
+        // Fall back to the admin-configured redirect URL (trusted, sanitized at save time)
+        $configured = (string) Auth_Popup_Core::get_setting( 'redirect_url', $home );
+        return ! empty( $configured ) ? $configured : $home;
     }
 
     private static function success( array $data = [] ): void {
