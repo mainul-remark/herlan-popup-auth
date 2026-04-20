@@ -309,24 +309,29 @@ class Auth_Popup_Ajax_Handler {
             self::error( $profile->get_error_message() );
         }
 
-        // If the OAuth profile contains a phone number, try to auto-login
-        $phone = isset( $profile['phone'] ) ? Auth_Popup_SMS_Service::normalise_phone( $profile['phone'] ) : '';
-        if ( $phone && Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
-            $user_by_phone = Auth_Popup_User_Auth::get_user_by_phone( $phone );
-            if ( $user_by_phone ) {
-                // Phone matched an existing account — auto-login
-                $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'google' );
-                if ( is_wp_error( $user ) ) {
-                    self::error( $user->get_error_message() );
+        // Check if a WP account already exists for this email
+        $oauth_email = sanitize_email( $profile['email'] ?? '' );
+        if ( ! empty( $oauth_email ) ) {
+            $existing_user = get_user_by( 'email', $oauth_email );
+            if ( $existing_user ) {
+                $existing_phone = Auth_Popup_User_Auth::get_user_phone( $existing_user->ID );
+                if ( ! empty( $existing_phone ) ) {
+                    // User exists and already has a phone — auto-login immediately
+                    $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'google' );
+                    if ( is_wp_error( $user ) ) {
+                        self::error( $user->get_error_message() );
+                    }
+                    self::success( [
+                        'message'  => __( 'Logged in with Google!', 'auth-popup' ),
+                        'redirect' => self::redirect_url(),
+                    ] );
                 }
-                self::success( [
-                    'message'  => __( 'Logged in with Google!', 'auth-popup' ),
-                    'redirect' => self::redirect_url(),
-                ] );
+                // User exists but has no phone — fall through to require phone
             }
+            // User not found — fall through to require phone (new account will be created)
         }
 
-        // No usable phone or no matching account — require mobile verification
+        // User has no phone on record or is new — require mobile verification
         $temp_token = wp_generate_password( 32, false );
         set_transient( 'ap_social_' . $temp_token, [ 'profile' => $profile, 'provider' => 'google' ], 15 * MINUTE_IN_SECONDS );
 
@@ -355,24 +360,29 @@ class Auth_Popup_Ajax_Handler {
             self::error( $profile->get_error_message() );
         }
 
-        // If the OAuth profile contains a phone number, try to auto-login
-        $phone = isset( $profile['phone'] ) ? Auth_Popup_SMS_Service::normalise_phone( $profile['phone'] ) : '';
-        if ( $phone && Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
-            $user_by_phone = Auth_Popup_User_Auth::get_user_by_phone( $phone );
-            if ( $user_by_phone ) {
-                // Phone matched an existing account — auto-login
-                $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'facebook' );
-                if ( is_wp_error( $user ) ) {
-                    self::error( $user->get_error_message() );
+        // Check if a WP account already exists for this email
+        $oauth_email = sanitize_email( $profile['email'] ?? '' );
+        if ( ! empty( $oauth_email ) ) {
+            $existing_user = get_user_by( 'email', $oauth_email );
+            if ( $existing_user ) {
+                $existing_phone = Auth_Popup_User_Auth::get_user_phone( $existing_user->ID );
+                if ( ! empty( $existing_phone ) ) {
+                    // User exists and already has a phone — auto-login immediately
+                    $user = Auth_Popup_User_Auth::login_or_create_oauth( $profile, 'facebook' );
+                    if ( is_wp_error( $user ) ) {
+                        self::error( $user->get_error_message() );
+                    }
+                    self::success( [
+                        'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
+                        'redirect' => self::redirect_url(),
+                    ] );
                 }
-                self::success( [
-                    'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
-                    'redirect' => self::redirect_url(),
-                ] );
+                // User exists but has no phone — fall through to require phone
             }
+            // User not found — fall through to require phone (new account will be created)
         }
 
-        // No usable phone or no matching account — require mobile verification
+        // User has no phone on record or is new — require mobile verification
         $temp_token = wp_generate_password( 32, false );
         set_transient( 'ap_social_' . $temp_token, [ 'profile' => $profile, 'provider' => 'facebook' ], 15 * MINUTE_IN_SECONDS );
 

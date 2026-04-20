@@ -260,6 +260,21 @@ class Auth_Popup_User_Auth {
         return $user;
     }
 
+    /**
+     * Get a stored phone number for a user (profiles table → billing_phone fallback).
+     */
+    public static function get_user_phone( int $user_id ): string {
+        global $wpdb;
+        $phone = $wpdb->get_var( $wpdb->prepare(
+            "SELECT phone FROM {$wpdb->prefix}auth_popup_user_profiles WHERE user_id = %d LIMIT 1",
+            $user_id
+        ) );
+        if ( $phone ) {
+            return $phone;
+        }
+        return (string) get_user_meta( $user_id, 'billing_phone', true );
+    }
+
     public static function get_user_by_phone( string $phone ): ?WP_User {
         global $wpdb;
 
