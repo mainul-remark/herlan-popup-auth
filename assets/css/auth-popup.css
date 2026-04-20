@@ -563,11 +563,13 @@
 }
 .ap-timer-text { font-weight: 600; }
 
-/* ── OTP / Register steps ─────────────────────────────────── */
+/* ── OTP / Register / Forgot steps ───────────────────────── */
 .ap-otp-step,
-.ap-reg-step { display: none; }
+.ap-reg-step,
+.ap-fp-step { display: none; }
 .ap-otp-step.active,
-.ap-reg-step.active { display: block; }
+.ap-reg-step.active,
+.ap-fp-step.active { display: block; }
 
 /* ── Link / Back btn ──────────────────────────────────────── */
 .ap-link {

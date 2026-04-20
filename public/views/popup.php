@@ -394,25 +394,82 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
 
             <div class="ap-panel-header">
                 <h2 class="ap-title"><?php esc_html_e( 'Forgot Password', 'auth-popup' ); ?></h2>
-                <p class="ap-subtitle"><?php esc_html_e( 'Enter your email address to receive a reset link and regain access to your account.', 'auth-popup' ); ?></p>
+                <p class="ap-subtitle" id="ap-forgot-subtitle"><?php esc_html_e( 'Enter your email address and we\'ll send you a verification code.', 'auth-popup' ); ?></p>
             </div>
 
-            <div class="ap-field">
-                <div class="ap-input-wrap">
-                    <svg class="ap-icon" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8"/>
-                        <polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/>
-                    </svg>
-                    <input type="email" id="ap-forgot-email"
-                           placeholder="<?php esc_attr_e( 'Email address', 'auth-popup' ); ?>"
-                           autocomplete="email">
+            <!-- Step 1: Email -->
+            <div class="ap-fp-step active" data-step="1">
+                <div class="ap-field">
+                    <div class="ap-input-wrap">
+                        <svg class="ap-icon" viewBox="0 0 24 24" fill="none">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8"/>
+                            <polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/>
+                        </svg>
+                        <input type="email" id="ap-forgot-email"
+                               placeholder="<?php esc_attr_e( 'Email address', 'auth-popup' ); ?>"
+                               autocomplete="email">
+                    </div>
                 </div>
-            </div>
+                <button type="button" class="ap-btn ap-btn-primary" id="ap-forgot-submit">
+                    <?php esc_html_e( 'Send OTP', 'auth-popup' ); ?>
+                </button>
+            </div><!-- /step 1 -->
 
-            <button type="button" class="ap-btn ap-btn-primary" id="ap-forgot-submit"
-                    data-lostpass="<?php echo $lostpass_url; ?>">
-                <?php esc_html_e( 'Continue', 'auth-popup' ); ?>
-            </button>
+            <!-- Step 2: OTP verification -->
+            <div class="ap-fp-step" id="ap-fp-step-2" data-step="2">
+                <p class="ap-otp-hint" id="ap-forgot-otp-hint"></p>
+                <div class="ap-field">
+                    <label><?php esc_html_e( 'Enter OTP', 'auth-popup' ); ?></label>
+                    <div class="ap-otp-inputs" id="ap-forgot-otp-inputs">
+                        <?php for ( $i = 0; $i < 6; $i++ ) : ?>
+                            <input type="tel" class="ap-otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                        <?php endfor; ?>
+                    </div>
+                    <input type="hidden" id="ap-forgot-otp">
+                </div>
+                <div class="ap-otp-timer">
+                    <span class="ap-timer-text"></span>
+                    <button type="button" class="ap-link ap-resend-btn" id="ap-forgot-resend-btn"
+                            data-form="forgot" style="display:none;">
+                        <?php esc_html_e( 'Resend OTP', 'auth-popup' ); ?>
+                    </button>
+                </div>
+                <button type="button" class="ap-btn ap-btn-primary" id="ap-forgot-verify-otp-btn">
+                    <?php esc_html_e( 'Verify OTP', 'auth-popup' ); ?>
+                </button>
+                <button type="button" class="ap-link" id="ap-forgot-back-to-email">
+                    <?php esc_html_e( '← Change email', 'auth-popup' ); ?>
+                </button>
+            </div><!-- /step 2 -->
+
+            <!-- Step 3: New password -->
+            <div class="ap-fp-step" data-step="3">
+                <div class="ap-field">
+                    <div class="ap-input-wrap">
+                        <svg class="ap-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        <input type="password" id="ap-forgot-new-password"
+                               placeholder="<?php esc_attr_e( 'New Password', 'auth-popup' ); ?>"
+                               autocomplete="new-password" minlength="6">
+                        <button type="button" class="ap-toggle-pass" tabindex="-1">
+                            <svg class="ap-eye" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ap-field">
+                    <div class="ap-input-wrap">
+                        <svg class="ap-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        <input type="password" id="ap-forgot-confirm-password"
+                               placeholder="<?php esc_attr_e( 'Confirm New Password', 'auth-popup' ); ?>"
+                               autocomplete="new-password" minlength="6">
+                        <button type="button" class="ap-toggle-pass" tabindex="-1">
+                            <svg class="ap-eye" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="ap-btn ap-btn-primary" id="ap-forgot-reset-btn">
+                    <?php esc_html_e( 'Reset Password', 'auth-popup' ); ?>
+                </button>
+            </div><!-- /step 3 -->
 
         </div><!-- /forgot panel -->
 

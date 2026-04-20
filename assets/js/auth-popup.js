@@ -88,6 +88,7 @@
             this.$overlay.fadeOut(160);
             $('body').removeClass('ap-no-scroll');
             this.clearAllTimers();
+            this.resetForgotPanel();
         },
 
         /* ── Close handlers ─────────────────────────────────────────── */
@@ -329,6 +330,7 @@
             // Resend OTP
             this.$overlay.on('click', '.ap-resend-btn', (e) => {
                 const form  = $(e.currentTarget).data('form');
+                if (form === 'forgot') return; // handled by bindForgotPanel
                 const phone = this.getPhoneFromForm(form);
                 if (!phone) return;
                 $(e.currentTarget).closest('form').find('.ap-otp-digit').val('').removeClass('ap-filled');
@@ -727,21 +729,21 @@
             });
         },
 
-        /* ── Forgot Password panel ───────────────────────────────────── */
+        /* ── Forgot Password panel (3-step: email → OTP → new password) ── */
         bindForgotPanel() {
-            // "Forgot Password" trigger in login form → show forgot panel
+            // "Forgot Password" trigger → show forgot panel reset to step 1
             this.$overlay.on('click', '.ap-forgot-trigger', (e) => {
                 e.preventDefault();
+                this.resetForgotPanel();
                 this.$overlay.find('.ap-tab[data-tab="forgot"]').trigger('click');
                 this.clearAlert();
                 this.$dialog.scrollTop(0);
             });
 
-            // "Continue" button in forgot panel → validate then redirect to WP lost-password page
+            // Step 1: Submit email → send OTP
             this.$overlay.on('click', '#ap-forgot-submit', (e) => {
-                const $btn       = $(e.currentTarget);
-                const email      = $('#ap-forgot-email').val().trim();
-                const lostpassUrl = $btn.data('lostpass');
+                const $btn  = $(e.currentTarget);
+                const email = $('#ap-forgot-email').val().trim();
 
                 if (!email) {
                     this.showAlert('error', this.i18n('Please enter your email address.'));
@@ -753,9 +755,182 @@
                 }
 
                 $btn.addClass('ap-loading').prop('disabled', true);
-                // Redirect to WordPress lost-password page
-                window.location.href = lostpassUrl;
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_forgot_password',
+                        nonce:  AuthPopup.nonce,
+                        email:  email,
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            this.fpEmail = email;
+                            this.showFpStep(2);
+                            $('#ap-forgot-otp-hint').text(this.i18n('OTP sent to') + ' ' + email);
+                            this.startTimer('forgot', res.data.expiry_seconds || 600, '#ap-fp-step-2');
+                            $('#ap-forgot-otp-inputs .ap-otp-digit').first().focus();
+                            this.showAlert('success', res.data.message);
+                        } else {
+                            this.showAlert('error', res.data.message || this.i18n('Failed to send OTP.'));
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
             });
+
+            // Step 2: Verify OTP
+            this.$overlay.on('click', '#ap-forgot-verify-otp-btn', (e) => {
+                const $btn = $(e.currentTarget);
+                const otp  = $('#ap-forgot-otp').val();
+
+                if (!otp || otp.length !== 6) {
+                    this.showAlert('error', this.i18n('Please enter the 6-digit OTP.'));
+                    return;
+                }
+
+                $btn.addClass('ap-loading').prop('disabled', true);
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_verify_forgot_otp',
+                        nonce:  AuthPopup.nonce,
+                        email:  this.fpEmail,
+                        otp:    otp,
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            this.fpResetToken = res.data.reset_token;
+                            this.clearTimer('forgot');
+                            this.showFpStep(3);
+                            $('#ap-forgot-new-password').focus();
+                            this.clearAlert();
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
+            });
+
+            // Step 2 resend OTP
+            this.$overlay.on('click', '#ap-forgot-resend-btn', () => {
+                if (!this.fpEmail) return;
+                $('#ap-forgot-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+                $('#ap-forgot-otp').val('');
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_forgot_password',
+                        nonce:  AuthPopup.nonce,
+                        email:  this.fpEmail,
+                    },
+                    success: (res) => {
+                        if (res.success) {
+                            this.startTimer('forgot', res.data.expiry_seconds || 600, '#ap-fp-step-2');
+                            this.showAlert('success', res.data.message);
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => this.showAlert('error', AuthPopup.i18n.error_network),
+                });
+            });
+
+            // Step 2 back → step 1
+            this.$overlay.on('click', '#ap-forgot-back-to-email', () => {
+                this.clearTimer('forgot');
+                $('#ap-forgot-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+                $('#ap-forgot-otp').val('');
+                this.showFpStep(1);
+                this.clearAlert();
+            });
+
+            // Step 3: Reset password
+            this.$overlay.on('click', '#ap-forgot-reset-btn', (e) => {
+                const $btn    = $(e.currentTarget);
+                const newPass = $('#ap-forgot-new-password').val();
+                const confPass = $('#ap-forgot-confirm-password').val();
+
+                if (!newPass) {
+                    this.showAlert('error', this.i18n('Password is required.'));
+                    return;
+                }
+                if (newPass.length < 6) {
+                    this.showAlert('error', this.i18n('Password must be at least 6 characters.'));
+                    return;
+                }
+                if (newPass !== confPass) {
+                    this.showAlert('error', this.i18n('Passwords do not match.'));
+                    return;
+                }
+
+                $btn.addClass('ap-loading').prop('disabled', true);
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action:           'auth_popup_reset_password',
+                        nonce:            AuthPopup.nonce,
+                        reset_token:      this.fpResetToken,
+                        new_password:     newPass,
+                        confirm_password: confPass,
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            this.showAlert('success', res.data.message);
+                            // Switch to login tab after short delay
+                            setTimeout(() => {
+                                this.resetForgotPanel();
+                                this.$overlay.find('.ap-tab[data-tab="login"]').trigger('click');
+                                this.clearAlert();
+                            }, 2200);
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
+            });
+        },
+
+        showFpStep(step) {
+            $('#ap-panel-forgot').find('.ap-fp-step').removeClass('active');
+            $('#ap-panel-forgot').find('.ap-fp-step[data-step="' + step + '"]').addClass('active');
+        },
+
+        resetForgotPanel() {
+            this.clearTimer('forgot');
+            this.fpEmail      = '';
+            this.fpResetToken = '';
+            this.showFpStep(1);
+            $('#ap-forgot-email').val('');
+            $('#ap-forgot-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+            $('#ap-forgot-otp').val('');
+            $('#ap-forgot-new-password').val('');
+            $('#ap-forgot-confirm-password').val('');
         },
 
         /* ── Header back button ──────────────────────────────────────── */

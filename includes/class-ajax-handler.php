@@ -20,6 +20,9 @@ class Auth_Popup_Ajax_Handler {
             'auth_popup_logout',
             'auth_popup_check_phone',
             'auth_popup_get_loyalty_rules',
+            'auth_popup_forgot_password',
+            'auth_popup_verify_forgot_otp',
+            'auth_popup_reset_password',
         ];
 
         foreach ( $actions as $action ) {
@@ -533,6 +536,187 @@ class Auth_Popup_Ajax_Handler {
         self::success( $payload );
     }
 
+    /* ── Forgot Password: Step 1 — Send OTP to email ───────────────── */
+
+    public static function auth_popup_forgot_password(): void {
+        self::verify_nonce();
+
+        $email = sanitize_email( $_POST['email'] ?? '' );
+
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            self::error( __( 'Please enter a valid email address.', 'auth-popup' ) );
+        }
+
+        $user = get_user_by( 'email', $email );
+        if ( ! $user ) {
+            self::error( __( 'No account found with this email address.', 'auth-popup' ) );
+        }
+
+        $hash     = md5( strtolower( $email ) );
+        $key_otp  = 'ap_fp_' . $hash;
+        $key_lock = 'ap_fp_lock_' . $hash;
+
+        if ( get_transient( $key_lock ) ) {
+            self::error( __( 'Please wait a moment before requesting another OTP.', 'auth-popup' ) );
+        }
+
+        $otp    = str_pad( (string) random_int( 0, 999999 ), 6, '0', STR_PAD_LEFT );
+        $expiry = 10 * MINUTE_IN_SECONDS;
+
+        set_transient( $key_otp,  wp_hash( $otp ), $expiry );
+        set_transient( $key_lock, 1,               60 ); // 60-second resend cooldown
+
+        $site_name = get_bloginfo( 'name' );
+
+        /* translators: %s: site name */
+        $subject = sprintf( __( 'Password Reset OTP – %s', 'auth-popup' ), $site_name );
+
+        $body = self::build_forgot_otp_email( $user->display_name, $otp, $site_name );
+
+        $headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+
+        // Ensure the From address is a syntactically valid email.
+        // On local/dev environments the admin email or site URL may contain
+        // "localhost" (no dot in domain), which PHPMailer rejects outright.
+        // We run at PHP_INT_MAX but only replace the address when it is already
+        // invalid, so a properly-configured SMTP plugin on production is untouched.
+        $from_sanitizer = static function ( string $from ): string {
+            if ( is_email( $from ) ) {
+                return $from; // already valid — don't touch it
+            }
+            $host = (string) wp_parse_url( get_site_url(), PHP_URL_HOST );
+            if ( str_starts_with( $host, 'www.' ) ) {
+                $host = substr( $host, 4 );
+            }
+            // Domains without a dot (e.g. "localhost") are invalid in email addresses
+            if ( empty( $host ) || strpos( $host, '.' ) === false ) {
+                $host .= '.local';
+            }
+            return 'noreply@' . $host;
+        };
+        add_filter( 'wp_mail_from', $from_sanitizer, PHP_INT_MAX );
+
+        // Capture the real PHPMailer error if sending still fails
+        $mail_error     = null;
+        $error_listener = function ( WP_Error $err ) use ( &$mail_error ) {
+            $mail_error = $err->get_error_message();
+        };
+        add_action( 'wp_mail_failed', $error_listener );
+
+        $sent = wp_mail( $email, $subject, $body, $headers );
+
+        remove_filter( 'wp_mail_from', $from_sanitizer, PHP_INT_MAX );
+        remove_action( 'wp_mail_failed', $error_listener );
+
+        if ( ! $sent ) {
+            delete_transient( $key_otp );
+            delete_transient( $key_lock );
+            $reason = $mail_error
+                ? $mail_error
+                : __( 'Mail server returned an error. Please contact support.', 'auth-popup' );
+            self::error( $reason );
+        }
+
+        self::success( [
+            'message'        => __( 'OTP sent to your email address.', 'auth-popup' ),
+            'expiry_seconds' => $expiry,
+        ] );
+    }
+
+    /* ── Forgot Password: Step 2 — Verify email OTP ─────────────────── */
+
+    public static function auth_popup_verify_forgot_otp(): void {
+        self::verify_nonce();
+
+        $email = sanitize_email( $_POST['email'] ?? '' );
+        $otp   = sanitize_text_field( $_POST['otp']   ?? '' );
+
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            self::error( __( 'Invalid email address.', 'auth-popup' ) );
+        }
+
+        if ( strlen( $otp ) !== 6 || ! ctype_digit( $otp ) ) {
+            self::error( __( 'Invalid OTP format.', 'auth-popup' ) );
+        }
+
+        $hash         = md5( strtolower( $email ) );
+        $key_otp      = 'ap_fp_' . $hash;
+        $key_attempts = 'ap_fp_va_' . $hash;
+
+        $attempts = (int) get_transient( $key_attempts );
+        if ( $attempts >= 5 ) {
+            delete_transient( $key_otp );
+            self::error( __( 'Too many incorrect attempts. Please request a new OTP.', 'auth-popup' ) );
+        }
+
+        $stored = get_transient( $key_otp );
+        if ( false === $stored ) {
+            self::error( __( 'OTP has expired. Please request a new one.', 'auth-popup' ) );
+        }
+
+        if ( ! hash_equals( $stored, wp_hash( $otp ) ) ) {
+            set_transient( $key_attempts, $attempts + 1, 10 * MINUTE_IN_SECONDS );
+            self::error( __( 'Incorrect OTP. Please try again.', 'auth-popup' ) );
+        }
+
+        // Correct — consume OTP and issue a short-lived reset token
+        delete_transient( $key_otp );
+        delete_transient( $key_attempts );
+        delete_transient( 'ap_fp_lock_' . $hash );
+
+        $reset_token = wp_generate_password( 32, false );
+        set_transient( 'ap_fp_rt_' . $reset_token, strtolower( $email ), 15 * MINUTE_IN_SECONDS );
+
+        self::success( [
+            'message'     => __( 'OTP verified. Please set your new password.', 'auth-popup' ),
+            'reset_token' => $reset_token,
+        ] );
+    }
+
+    /* ── Forgot Password: Step 3 — Reset password ───────────────────── */
+
+    public static function auth_popup_reset_password(): void {
+        self::verify_nonce();
+
+        $reset_token      = sanitize_text_field( $_POST['reset_token']      ?? '' );
+        $new_password     = $_POST['new_password']      ?? '';
+        $confirm_password = $_POST['confirm_password']  ?? '';
+
+        if ( empty( $reset_token ) ) {
+            self::error( __( 'Session expired. Please start over.', 'auth-popup' ) );
+        }
+
+        $email = get_transient( 'ap_fp_rt_' . $reset_token );
+        if ( ! $email ) {
+            self::error( __( 'Session expired. Please start over.', 'auth-popup' ) );
+        }
+
+        if ( empty( $new_password ) ) {
+            self::error( __( 'New password is required.', 'auth-popup' ) );
+        }
+
+        if ( strlen( $new_password ) < 6 ) {
+            self::error( __( 'Password must be at least 6 characters.', 'auth-popup' ) );
+        }
+
+        if ( $new_password !== $confirm_password ) {
+            self::error( __( 'Passwords do not match.', 'auth-popup' ) );
+        }
+
+        $user = get_user_by( 'email', $email );
+        if ( ! $user ) {
+            delete_transient( 'ap_fp_rt_' . $reset_token );
+            self::error( __( 'Account not found.', 'auth-popup' ) );
+        }
+
+        wp_set_password( $new_password, $user->ID );
+        delete_transient( 'ap_fp_rt_' . $reset_token );
+
+        self::success( [
+            'message' => __( 'Password reset successfully! You can now log in with your new password.', 'auth-popup' ),
+        ] );
+    }
+
     /* ── Check Phone (for registration) ─────────────────────────────── */
 
     public static function auth_popup_check_phone(): void {
@@ -689,6 +873,35 @@ class Auth_Popup_Ajax_Handler {
     private static function clear_password_failures( string $credential ): void {
         delete_transient( self::pw_ip_key() );
         delete_transient( self::pw_cred_key( $credential ) );
+    }
+
+    /* ── Forgot-password email builder ──────────────────────────────── */
+
+    private static function build_forgot_otp_email( string $name, string $otp, string $site_name ): string {
+        $digits = '';
+        foreach ( str_split( $otp ) as $d ) {
+            $digits .= '<span style="display:inline-block;width:40px;height:48px;line-height:48px;text-align:center;font-size:28px;font-weight:700;border:2px solid #e5e7eb;border-radius:8px;margin:0 4px;color:#111827;">' . esc_html( $d ) . '</span>';
+        }
+
+        return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f9fafb;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+  <tr><td align="center">
+    <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.08);">
+      <tr><td style="background:#111827;padding:28px 36px;">
+        <h1 style="margin:0;color:#ffffff;font-size:20px;">' . esc_html( $site_name ) . '</h1>
+      </td></tr>
+      <tr><td style="padding:36px;">
+        <p style="margin:0 0 8px;color:#374151;font-size:15px;">Hello <strong>' . esc_html( $name ) . '</strong>,</p>
+        <p style="margin:0 0 28px;color:#6b7280;font-size:14px;">Use the OTP below to reset your password. It expires in <strong>10 minutes</strong>.</p>
+        <div style="text-align:center;margin:0 0 28px;">' . $digits . '</div>
+        <p style="margin:0;color:#9ca3af;font-size:12px;">If you did not request a password reset, please ignore this email. Do not share this code with anyone.</p>
+      </td></tr>
+      <tr><td style="background:#f3f4f6;padding:16px 36px;text-align:center;">
+        <p style="margin:0;color:#9ca3af;font-size:12px;">&copy; ' . esc_html( $site_name ) . '</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table></body></html>';
     }
 
     /* ── Helpers ─────────────────────────────────────────────────────── */
