@@ -888,6 +888,11 @@
     font-family: var(--ap-font);
 }
 
+/* ── My Account Page Title ───────────────────────────────── */
+body.woocommerce-account .entry-title {
+    text-align: center;
+}
+
 /* ── Mobile Account Content Modal ────────────────────────── */
 #ap-acct-modal { display: none; }
 
