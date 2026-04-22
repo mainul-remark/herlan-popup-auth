@@ -614,6 +614,8 @@ class Auth_Popup_Core {
             // Checkout
             'checkout_hide_shipping_form'       => '1',
             'checkout_disable_ship_to_different'=> '1',
+            // My Account inline form
+            'myaccount_inline_form'             => '1',
         ];
     }
 

@@ -48,6 +48,7 @@ class Auth_Popup_Admin_Settings {
             'loyalty_enabled',
             'checkout_hide_shipping_form',
             'checkout_disable_ship_to_different',
+            'myaccount_inline_form',
         ];
 
         foreach ( $defaults as $key => $default ) {

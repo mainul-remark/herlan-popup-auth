@@ -149,6 +149,16 @@
             <div id="tab-general" class="auth-popup-tab-content">
                 <table class="form-table">
                     <tr>
+                        <th><?php esc_html_e( 'Inline Form on My Account Page', 'auth-popup' ); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="auth_popup_settings[myaccount_inline_form]" value="1" <?php checked( $s['myaccount_inline_form'] ?? '1', '1' ); ?>>
+                                <?php esc_html_e( 'Replace the WooCommerce login form on /my-account with the auth popup\'s inline login/register form (no popup overlay)', 'auth-popup' ); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e( 'The popup still works normally on all other pages. Only the /my-account login page is affected.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th><?php esc_html_e( 'Enable Password Login', 'auth-popup' ); ?></th>
                         <td>
                             <label>

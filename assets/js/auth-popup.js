@@ -19,15 +19,27 @@
             // Runs for all users — has its own isLoggedIn guard inside
             this.initAccountDrawer();
 
-            // Everything below requires the popup overlay (guest users only)
-            this.$overlay = $('#auth-popup-overlay');
-            if (!this.$overlay.length) return;
+            // Support popup mode (all pages) and inline mode (my-account / shortcode)
+            this.$overlay    = $('#auth-popup-overlay');
+            this.$inlineWrap = $('.ap-inline-wrap');
+            this.isInline    = this.$inlineWrap.length > 0;
 
-            this.$dialog = this.$overlay.find('.ap-dialog');
-            this.$alert  = this.$overlay.find('#ap-alert');
+            if (!this.$overlay.length && !this.isInline) return;
 
-            this.bindTriggers();
-            this.bindClose();
+            // $ctx = event delegation root — overlay in popup mode, inline wrap on my-account
+            this.$ctx = this.isInline ? this.$inlineWrap : this.$overlay;
+
+            if (!this.isInline) {
+                this.$dialog = this.$ctx.find('.ap-dialog');
+            } else {
+                this.$dialog = this.$inlineWrap;
+            }
+            this.$alert = $('#ap-alert');
+
+            if (!this.isInline) {
+                this.bindTriggers();
+                this.bindClose();
+            }
             this.bindMainTabs();
             this.bindModeTabs();
             this.bindSendOTP();
@@ -43,7 +55,7 @@
             this.initGoogle();
             this.initFacebook();
             this.initSocialComplete();
-            this.initCheckout();
+            if (!this.isInline) this.initCheckout();
             this.loadLoyaltyRules();
             this.initDatepicker();
         },
@@ -94,7 +106,7 @@
         /* ── Close handlers ─────────────────────────────────────────── */
         bindClose() {
             $('#ap-close-btn').on('click', () => this.close());
-            this.$overlay.find('.ap-mask').on('click', () => this.close());
+            this.$ctx.find('.ap-mask').on('click', () => this.close());
             $(document).on('keydown', (e) => {
                 if (e.key === 'Escape' && this.$overlay.is(':visible')) this.close();
             });
@@ -102,10 +114,10 @@
 
         /* ── Main tabs (Login / Register) ──────────────────────────── */
         bindMainTabs() {
-            this.$overlay.on('click', '.ap-tab', (e) => {
+            this.$ctx.on('click', '.ap-tab', (e) => {
                 const $tab    = $(e.currentTarget);
                 const $tabs   = $tab.closest('.ap-tabs').find('.ap-tab');
-                const $panels = this.$overlay.find('.ap-panel');
+                const $panels = this.$ctx.find('.ap-panel');
                 const tab     = $tab.data('tab');
 
                 $tabs.removeClass('active');
@@ -119,7 +131,7 @@
 
         /* ── Mode tabs (Password / OTP) ─────────────────────────────── */
         bindModeTabs() {
-            this.$overlay.on('click', '.ap-mode-tab', (e) => {
+            this.$ctx.on('click', '.ap-mode-tab', (e) => {
                 const $tab   = $(e.currentTarget);
                 const $group = $tab.closest('.ap-mode-tabs');
                 $group.find('.ap-mode-tab').removeClass('active');
@@ -136,7 +148,7 @@
 
         /* ── Send OTP ───────────────────────────────────────────────── */
         bindSendOTP() {
-            this.$overlay.on('click', '.ap-send-otp-btn', (e) => {
+            this.$ctx.on('click', '.ap-send-otp-btn', (e) => {
                 const $btn  = $(e.currentTarget);
                 const form  = $btn.data('form'); // 'login' or 'register'
                 const phone = this.getPhoneFromForm(form);
@@ -231,7 +243,7 @@
 
         /* ── OTP digit inputs ───────────────────────────────────────── */
         bindOTPInputs() {
-            this.$overlay.on('input keydown paste', '.ap-otp-digit', function (e) {
+            this.$ctx.on('input keydown paste', '.ap-otp-digit', function (e) {
                 const $inputs = $(this).closest('.ap-otp-inputs').find('.ap-otp-digit');
                 const idx     = $inputs.index(this);
 
@@ -312,7 +324,7 @@
         /* ── Resend OTP ─────────────────────────────────────────────── */
         bindBackBtns() {
             // Back button resets to step 1
-            this.$overlay.on('click', '.ap-back-btn', (e) => {
+            this.$ctx.on('click', '.ap-back-btn', (e) => {
                 const $form = $(e.currentTarget).closest('form');
                 $form.find('.ap-otp-step, .ap-reg-step').removeClass('active');
                 $form.find('[data-step="1"]').addClass('active');
@@ -322,13 +334,13 @@
             });
 
             // Back from step 3 → step 2 in register flow
-            this.$overlay.on('click', '.ap-back-to-step2-btn', () => {
+            this.$ctx.on('click', '.ap-back-to-step2-btn', () => {
                 this.showStep('#ap-register-form', 2, '.ap-reg-step');
                 this.clearAlert();
             });
 
             // Resend OTP
-            this.$overlay.on('click', '.ap-resend-btn', (e) => {
+            this.$ctx.on('click', '.ap-resend-btn', (e) => {
                 const form  = $(e.currentTarget).data('form');
                 if (form === 'forgot') return; // handled by bindForgotPanel
                 const phone = this.getPhoneFromForm(form);
@@ -368,13 +380,13 @@
         /* ── Forms submit ───────────────────────────────────────────── */
         bindForms() {
             // Login: Password form
-            this.$overlay.on('submit', '#ap-login-password-form', (e) => {
+            this.$ctx.on('submit', '#ap-login-password-form', (e) => {
                 e.preventDefault();
                 this.submitForm($(e.currentTarget), 'auth_popup_login_password');
             });
 
             // Login: OTP form
-            this.$overlay.on('submit', '#ap-login-otp-form', (e) => {
+            this.$ctx.on('submit', '#ap-login-otp-form', (e) => {
                 e.preventDefault();
                 const $form = $(e.currentTarget);
                 const otp   = $form.find('input[name="otp"]').val();
@@ -387,7 +399,7 @@
             });
 
             // Register form
-            this.$overlay.on('submit', '#ap-register-form', (e) => {
+            this.$ctx.on('submit', '#ap-register-form', (e) => {
                 e.preventDefault();
                 const $form = $(e.currentTarget);
                 const otp   = $form.find('input[name="otp"]').val();
@@ -400,7 +412,7 @@
             });
 
             // Register: Verify OTP (step 2 → step 3)
-            this.$overlay.on('click', '.ap-verify-reg-otp-btn', (e) => {
+            this.$ctx.on('click', '.ap-verify-reg-otp-btn', (e) => {
                 const $form = $(e.currentTarget).closest('form');
                 const otp   = $form.find('input[name="otp"]').val();
                 if (!otp || otp.length !== 6) {
@@ -452,7 +464,7 @@
 
         /* ── Password show/hide ─────────────────────────────────────── */
         bindPasswordToggle() {
-            this.$overlay.on('click', '.ap-toggle-pass', function () {
+            this.$ctx.on('click', '.ap-toggle-pass', function () {
                 const $input = $(this).siblings('input');
                 const type   = $input.attr('type') === 'password' ? 'text' : 'password';
                 $input.attr('type', type);
@@ -462,11 +474,11 @@
         /* ── Phone availability check (registration) ────────────────── */
         bindPhoneCheck() {
             let debounceTimer;
-            this.$overlay.on('input', '#ap-reg-phone', (e) => {
+            this.$ctx.on('input', '#ap-reg-phone', (e) => {
                 clearTimeout(debounceTimer);
                 const $input  = $(e.currentTarget);
                 const $msg    = $input.closest('.ap-field').find('.ap-phone-check-msg');
-                const $otpBtn = this.$overlay.find('.ap-send-otp-btn[data-form="register"]');
+                const $otpBtn = this.$ctx.find('.ap-send-otp-btn[data-form="register"]');
                 const phone   = $input.val().trim();
 
                 $msg.text('').removeClass('taken free');
@@ -503,7 +515,7 @@
 
         /* ── Loyalty Programme toggle ───────────────────────────────── */
         bindLoyaltyToggle() {
-            this.$overlay.on('change', '#ap-join-loyalty', function () {
+            this.$ctx.on('change', '#ap-join-loyalty', function () {
                 const $fields = $('#ap-loyalty-fields');
                 if ($(this).is(':checked')) {
                     $('#ap-loyalty-benefits').hide();
@@ -518,29 +530,29 @@
             });
 
             // Show loyalty fields on load since checkbox is checked by default
-            if (this.$overlay.find('#ap-join-loyalty').is(':checked')) {
-                this.$overlay.find('#ap-loyalty-fields').show();
-                this.$overlay.find('#ap-loyalty-benefits').hide();
-                this.$overlay.find('select[name="gender"], input[name="dob"]').attr('required', true);
+            if (this.$ctx.find('#ap-join-loyalty').is(':checked')) {
+                this.$ctx.find('#ap-loyalty-fields').show();
+                this.$ctx.find('#ap-loyalty-benefits').hide();
+                this.$ctx.find('select[name="gender"], input[name="dob"]').attr('required', true);
             }
         },
 
         /* ── Loyalty validation before OTP send ─────────────────────── */
         validateLoyaltyFields() {
-            const $checkbox = this.$overlay.find('#ap-join-loyalty');
+            const $checkbox = this.$ctx.find('#ap-join-loyalty');
             if (!$checkbox.is(':checked')) return true; // not joining, skip
 
-            const gender = this.$overlay.find('select[name="gender"]').val();
-            const dob    = this.$overlay.find('input[name="dob"]').val();
+            const gender = this.$ctx.find('select[name="gender"]').val();
+            const dob    = this.$ctx.find('input[name="dob"]').val();
 
             if (!gender) {
                 this.showAlert('error', this.i18n('Please select your gender to join the Loyalty Programme.'));
-                this.$overlay.find('select[name="gender"]').focus();
+                this.$ctx.find('select[name="gender"]').focus();
                 return false;
             }
             if (!dob) {
                 this.showAlert('error', this.i18n('Please enter your date of birth to join the Loyalty Programme.'));
-                this.$overlay.find('input[name="dob"]').focus();
+                this.$ctx.find('input[name="dob"]').focus();
                 return false;
             }
             return true;
@@ -551,7 +563,7 @@
             if (AuthPopup.enableGoogle !== '1') return;
 
             if (!AuthPopup.googleClientId) {
-                this.$overlay.on('click', '.ap-btn-google', () => {
+                this.$ctx.on('click', '.ap-btn-google', () => {
                     this.showAlert('error', 'Google Client ID is not configured. Go to Settings → Auth Popup.');
                 });
                 return;
@@ -569,7 +581,7 @@
                                 this.showAlert('error', 'Google sign-in failed: ' + tokenResponse.error);
                                 return;
                             }
-                            const $btns = this.$overlay.find('.ap-btn-google');
+                            const $btns = this.$ctx.find('.ap-btn-google');
                             $btns.addClass('ap-loading').prop('disabled', true);
                             $.ajax({
                                 url:    AuthPopup.ajaxUrl,
@@ -606,7 +618,7 @@
             };
             tryInitGoogle();
 
-            this.$overlay.on('click', '.ap-btn-google', () => {
+            this.$ctx.on('click', '.ap-btn-google', () => {
                 if (!tokenClient) {
                     this.showAlert('error', 'Google sign-in library not loaded. Please refresh the page.');
                     return;
@@ -620,7 +632,7 @@
             if (AuthPopup.enableFacebook !== '1') return;
 
             // Button click: guard against unconfigured state
-            this.$overlay.on('click', '.ap-btn-facebook', () => {
+            this.$ctx.on('click', '.ap-btn-facebook', () => {
                 if (!AuthPopup.facebookAppId) {
                     this.showAlert('error', 'Facebook App ID is not configured. Go to Settings → Auth Popup.');
                     return;
@@ -645,7 +657,7 @@
         },
 
         doFacebookLogin() {
-            const $btns = this.$overlay.find('.ap-btn-facebook');
+            const $btns = this.$ctx.find('.ap-btn-facebook');
             $btns.addClass('ap-loading').prop('disabled', true);
 
             FB.login((loginRes) => {
@@ -733,10 +745,10 @@
 
         /* ── Switch panel links ("Don't have an account?" etc.) ─────── */
         bindSwitchLinks() {
-            this.$overlay.on('click', '.ap-switch-link', (e) => {
+            this.$ctx.on('click', '.ap-switch-link', (e) => {
                 e.preventDefault();
                 const to = $(e.currentTarget).data('switch-to');
-                this.$overlay.find('.ap-tab[data-tab="' + to + '"]').trigger('click');
+                this.$ctx.find('.ap-tab[data-tab="' + to + '"]').trigger('click');
                 this.clearAlert();
                 this.$dialog.scrollTop(0);
             });
@@ -745,16 +757,16 @@
         /* ── Forgot Password panel (3-step: email → OTP → new password) ── */
         bindForgotPanel() {
             // "Forgot Password" trigger → show forgot panel reset to step 1
-            this.$overlay.on('click', '.ap-forgot-trigger', (e) => {
+            this.$ctx.on('click', '.ap-forgot-trigger', (e) => {
                 e.preventDefault();
                 this.resetForgotPanel();
-                this.$overlay.find('.ap-tab[data-tab="forgot"]').trigger('click');
+                this.$ctx.find('.ap-tab[data-tab="forgot"]').trigger('click');
                 this.clearAlert();
                 this.$dialog.scrollTop(0);
             });
 
             // Step 1: Submit email → send OTP
-            this.$overlay.on('click', '#ap-forgot-submit', (e) => {
+            this.$ctx.on('click', '#ap-forgot-submit', (e) => {
                 const $btn  = $(e.currentTarget);
                 const email = $('#ap-forgot-email').val().trim();
 
@@ -799,7 +811,7 @@
             });
 
             // Step 2: Verify OTP
-            this.$overlay.on('click', '#ap-forgot-verify-otp-btn', (e) => {
+            this.$ctx.on('click', '#ap-forgot-verify-otp-btn', (e) => {
                 const $btn = $(e.currentTarget);
                 const otp  = $('#ap-forgot-otp').val();
 
@@ -840,7 +852,7 @@
             });
 
             // Step 2 resend OTP
-            this.$overlay.on('click', '#ap-forgot-resend-btn', () => {
+            this.$ctx.on('click', '#ap-forgot-resend-btn', () => {
                 if (!this.fpEmail) return;
                 $('#ap-forgot-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
                 $('#ap-forgot-otp').val('');
@@ -867,7 +879,7 @@
             });
 
             // Step 2 back → step 1
-            this.$overlay.on('click', '#ap-forgot-back-to-email', () => {
+            this.$ctx.on('click', '#ap-forgot-back-to-email', () => {
                 this.clearTimer('forgot');
                 $('#ap-forgot-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
                 $('#ap-forgot-otp').val('');
@@ -876,7 +888,7 @@
             });
 
             // Step 3: Reset password
-            this.$overlay.on('click', '#ap-forgot-reset-btn', (e) => {
+            this.$ctx.on('click', '#ap-forgot-reset-btn', (e) => {
                 const $btn    = $(e.currentTarget);
                 const newPass = $('#ap-forgot-new-password').val();
                 const confPass = $('#ap-forgot-confirm-password').val();
@@ -914,7 +926,7 @@
                             // Switch to login tab after short delay
                             setTimeout(() => {
                                 this.resetForgotPanel();
-                                this.$overlay.find('.ap-tab[data-tab="login"]').trigger('click');
+                                this.$ctx.find('.ap-tab[data-tab="login"]').trigger('click');
                                 this.clearAlert();
                             }, 2200);
                         } else {
@@ -964,7 +976,7 @@
                 }
                 // Forgot panel → go back to login
                 if ($('#ap-panel-forgot').hasClass('active')) {
-                    this.$overlay.find('.ap-tab[data-tab="login"]').trigger('click');
+                    this.$ctx.find('.ap-tab[data-tab="login"]').trigger('click');
                     this.clearAlert();
                     return;
                 }
@@ -1179,7 +1191,7 @@
             const viewMoreSvg = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
             const viewLessSvg = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 8l4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-            this.$overlay.on('click', '#ap-loyalty-view-more', () => {
+            this.$ctx.on('click', '#ap-loyalty-view-more', () => {
                 const $btn      = $('#ap-loyalty-view-more');
                 const expanded  = $btn.hasClass('ap-expanded');
                 if (expanded) {
@@ -1202,7 +1214,7 @@
          */
         showSocialCompletePanel(data) {
             // Hide all panels, show the social-complete one
-            this.$overlay.find('.ap-panel').removeClass('active');
+            this.$ctx.find('.ap-panel').removeClass('active');
             $('#ap-panel-social-complete').addClass('active');
 
             // Store the temp token so it's submitted with the form
@@ -1239,7 +1251,7 @@
 
         initSocialComplete() {
             // Phase 1: blur validation on phone field
-            this.$overlay.on('blur', '#ap-sc-phone', () => {
+            this.$ctx.on('blur', '#ap-sc-phone', () => {
                 const phone = $('#ap-sc-phone').val().trim();
                 const $msg  = $('#ap-sc-phone-msg');
 
@@ -1271,13 +1283,13 @@
             });
 
             // Clear message and re-enable button while user is typing
-            this.$overlay.on('input', '#ap-sc-phone', () => {
+            this.$ctx.on('input', '#ap-sc-phone', () => {
                 $('#ap-sc-phone-msg').text('').removeClass('taken free error');
                 $('#ap-sc-send-otp-btn').prop('disabled', false);
             });
 
             // Phase 1 → 2: Send OTP
-            this.$overlay.on('click', '#ap-sc-send-otp-btn', () => {
+            this.$ctx.on('click', '#ap-sc-send-otp-btn', () => {
                 const phone = $('#ap-sc-phone').val().trim();
                 const $msg  = $('#ap-sc-phone-msg');
 
@@ -1335,7 +1347,7 @@
             });
 
             // Phase 2: Verify OTP server-side → reveal phase 3 (loyalty + submit)
-            this.$overlay.on('click', '#ap-sc-verify-otp-btn', () => {
+            this.$ctx.on('click', '#ap-sc-verify-otp-btn', () => {
                 const otp   = $('#ap-sc-otp').val();
                 const phone = $('#ap-sc-phone').val().trim();
 
@@ -1381,7 +1393,7 @@
             });
 
             // Phase 2 back: return to phone input
-            this.$overlay.on('click', '#ap-sc-back-btn', () => {
+            this.$ctx.on('click', '#ap-sc-back-btn', () => {
                 // Restore phase 1 subtitle
                 $('#ap-sc-subtitle').text('Please verify your mobile number to complete sign-in.');
                 $('#ap-sc-otp-section').hide();
@@ -1393,7 +1405,7 @@
             });
 
             // Loyalty Programme toggle (phase 3)
-            this.$overlay.on('change', '#ap-sc-join-loyalty', function () {
+            this.$ctx.on('change', '#ap-sc-join-loyalty', function () {
                 const $loyaltyFields = $('#ap-sc-loyalty-fields');
                 if ($(this).is(':checked')) {
                     $('#ap-sc-loyalty-benefits').hide();
@@ -1407,7 +1419,7 @@
             });
 
             // Form submission (phase 3)
-            this.$overlay.on('submit', '#ap-social-complete-form', (e) => {
+            this.$ctx.on('submit', '#ap-social-complete-form', (e) => {
                 e.preventDefault();
                 if (!this.validateSocialLoyaltyFields()) return;
                 this.submitForm($(e.currentTarget), 'auth_popup_social_complete');
@@ -1415,20 +1427,20 @@
         },
 
         validateSocialLoyaltyFields() {
-            const $checkbox = this.$overlay.find('#ap-sc-join-loyalty');
+            const $checkbox = this.$ctx.find('#ap-sc-join-loyalty');
             if (!$checkbox.is(':checked')) return true;
 
-            const gender = this.$overlay.find('#ap-sc-gender').val();
-            const dob    = this.$overlay.find('#ap-sc-dob').val();
+            const gender = this.$ctx.find('#ap-sc-gender').val();
+            const dob    = this.$ctx.find('#ap-sc-dob').val();
 
             if (!gender) {
                 this.showAlert('error', this.i18n('Please select your gender to join the Loyalty Programme.'));
-                this.$overlay.find('#ap-sc-gender').focus();
+                this.$ctx.find('#ap-sc-gender').focus();
                 return false;
             }
             if (!dob) {
                 this.showAlert('error', this.i18n('Please enter your date of birth to join the Loyalty Programme.'));
-                this.$overlay.find('#ap-sc-dob').focus();
+                this.$ctx.find('#ap-sc-dob').focus();
                 return false;
             }
             return true;

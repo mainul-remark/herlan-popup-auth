@@ -1118,3 +1118,77 @@
     display: none!important;
 }
 /*custom css codes ends*/
+
+/* ── Inline Form (My Account page / [auth_popup_form] shortcode) ─────── */
+.ap-inline-wrap {
+    font-family: var(--ap-font);
+    width: 100%;
+    max-width: 480px;
+    margin: 36px auto;
+    background: var(--ap-bg);
+    border-radius: var(--ap-radius-dialog);
+    box-shadow: var(--ap-shadow);
+    padding: 28px 32px 32px;
+    box-sizing: border-box;
+}
+
+/* Visible tab bar for inline form */
+.ap-inline-tabs {
+    display: flex !important;
+    gap: 4px;
+    background: var(--ap-input-bg);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.ap-inline-tabs .ap-tab {
+    flex: 1;
+    padding: 9px 0;
+    font-size: .88rem;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    color: var(--ap-text-muted);
+    transition: color var(--ap-transition), background var(--ap-transition);
+    position: relative;
+    z-index: 1;
+}
+
+.ap-inline-tabs .ap-tab.active {
+    color: var(--ap-text);
+    background: var(--ap-bg);
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+/* Hide the "Forgot" tab — it appears only when triggered via link */
+.ap-inline-tabs .ap-tab-forgot-hidden {
+    display: none;
+}
+
+/* Suppress close button — not needed on a page */
+.ap-inline-wrap .ap-close {
+    display: none !important;
+}
+
+/* Input overrides inside inline form (match popup custom css) */
+.ap-inline-wrap #ap-panel-register input,
+.ap-inline-wrap #ap-panel-login input {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+.ap-inline-wrap #ap-sc-phone {
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 540px) {
+    .ap-inline-wrap {
+        border-radius: 16px;
+        padding: 22px 18px 26px;
+        margin: 20px auto;
+    }
+}

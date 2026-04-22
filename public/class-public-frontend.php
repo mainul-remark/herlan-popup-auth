@@ -6,7 +6,8 @@ class Auth_Popup_Public_Frontend {
     public static function init(): void {
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
         add_action( 'wp_footer',          [ __CLASS__, 'render_popup'   ] );
-        add_shortcode( 'auth_popup_button', [ __CLASS__, 'shortcode_button' ] );
+        add_shortcode( 'auth_popup_button', [ __CLASS__, 'shortcode_button'      ] );
+        add_shortcode( 'auth_popup_form',   [ __CLASS__, 'shortcode_inline_form' ] );
 
 
         // Pre-fill WooCommerce checkout shipping fields from user's default address
@@ -100,6 +101,11 @@ class Auth_Popup_Public_Frontend {
         }
 
         // Localise data for JS
+        $is_inline_page = Auth_Popup_Core::get_setting( 'myaccount_inline_form', '1' ) === '1'
+                          && function_exists( 'is_account_page' ) && is_account_page()
+                          && ! is_wc_endpoint_url()
+                          && ! is_user_logged_in();
+
         wp_localize_script( 'auth-popup', 'AuthPopup', [
             'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
             'nonce'           => wp_create_nonce( 'auth_popup_nonce' ),
@@ -114,6 +120,7 @@ class Auth_Popup_Public_Frontend {
             'isLoggedIn'      => is_user_logged_in() ? '1' : '0',
             'displayName'     => is_user_logged_in() ? wp_get_current_user()->display_name : '',
             'loyaltyNonce'    => wp_create_nonce( 'herlan_loyalty_nonce' ),
+            'isInlineForm'    => $is_inline_page ? '1' : '0',
             'myAccountUrl'    => function_exists( 'wc_get_page_permalink' )
                                     ? wc_get_page_permalink( 'myaccount' )
                                     : home_url( '/my-account/' ),
@@ -132,9 +139,24 @@ class Auth_Popup_Public_Frontend {
 
     public static function render_popup(): void {
         if ( is_user_logged_in() ) {
-            return; // No popup needed for logged-in users
+            return;
+        }
+        // Skip popup overlay on my-account page when inline form is enabled
+        if ( Auth_Popup_Core::get_setting( 'myaccount_inline_form', '1' ) === '1'
+             && function_exists( 'is_account_page' ) && is_account_page()
+             && ! is_wc_endpoint_url() ) {
+            return;
         }
         require AUTH_POPUP_PATH . 'public/views/popup.php';
+    }
+
+    public static function shortcode_inline_form(): string {
+        if ( is_user_logged_in() ) {
+            return '';
+        }
+        ob_start();
+        require AUTH_POPUP_PATH . 'public/views/inline-form.php';
+        return ob_get_clean();
     }
 
     /**
@@ -151,6 +173,13 @@ class Auth_Popup_Public_Frontend {
      */
     public static function locate_checkout_template( string $template, string $template_name, string $template_path ): string {
         $handled = [ 'checkout/form-checkout.php', 'myaccount/edit-address.php' ];
+
+        // Override WC login form with inline auth form when setting is enabled
+        if ( Auth_Popup_Core::get_setting( 'myaccount_inline_form', '1' ) === '1'
+             && ! is_user_logged_in() ) {
+            $handled[] = 'myaccount/form-login.php';
+        }
+
         if ( ! in_array( $template_name, $handled, true ) ) {
             return $template;
         }
