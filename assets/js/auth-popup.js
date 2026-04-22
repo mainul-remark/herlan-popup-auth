@@ -703,6 +703,19 @@
             $('#ap-guest-btn').on('click', () => {
                 this.close();
             });
+
+            // Intercept "Returning customer? Click here to login" — open auth popup
+            // instead of the default WooCommerce login form (.woocommerce-form-login).
+            // Uses capturing phase so it fires before WooCommerce's bubble-phase handler
+            // on document.body, making stopImmediatePropagation effective.
+            document.addEventListener('click', (e) => {
+                const link = e.target.closest('a.showlogin');
+                if (!link) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                this.open();
+            }, true);
         },
 
         /* ── Alert helpers ──────────────────────────────────────────── */
