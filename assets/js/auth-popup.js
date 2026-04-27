@@ -515,17 +515,23 @@
 
         /* ── Loyalty Programme toggle ───────────────────────────────── */
         bindLoyaltyToggle() {
-            this.$ctx.on('change', '#ap-join-loyalty', function () {
+            this.$ctx.on('change', '#ap-join-loyalty', (e) => {
                 const $fields = $('#ap-loyalty-fields');
-                if ($(this).is(':checked')) {
+                if ($(e.target).is(':checked')) {
                     $('#ap-loyalty-benefits').hide();
                     $fields.slideDown(220);
                     $fields.find('select[name="gender"], input[name="dob"]').attr('required', true);
+                    if (typeof $.fn.datepicker !== 'undefined') {
+                        $('#ap-reg-dob').datepicker(this._dpOpts || {});
+                    }
                 } else {
                     $fields.slideUp(180);
                     $('#ap-loyalty-benefits').show();
                     $fields.find('select[name="gender"], input[name="dob"]').removeAttr('required').val('');
                     $fields.find('input[name="card_number"]').val('');
+                    if (typeof $.fn.datepicker !== 'undefined') {
+                        $('#ap-reg-dob').datepicker('destroy');
+                    }
                 }
             });
 
@@ -1139,7 +1145,7 @@
             const maxDate = new Date();
             maxDate.setFullYear(maxDate.getFullYear() - 10);
 
-            const dpOpts = {
+            this._dpOpts = {
                 dateFormat:  'yy-mm-dd',
                 maxDate:     maxDate,
                 changeMonth: true,
@@ -1148,8 +1154,13 @@
                 showAnim:    'fadeIn',
             };
 
-            $('#ap-reg-dob').datepicker(dpOpts);
-            $('#ap-sc-dob').datepicker(dpOpts);
+            // Only attach when the checkbox is already checked on page load
+            if (this.$ctx.find('#ap-join-loyalty').is(':checked')) {
+                $('#ap-reg-dob').datepicker(this._dpOpts);
+            }
+            if (this.$ctx.find('#ap-sc-join-loyalty').is(':checked')) {
+                $('#ap-sc-dob').datepicker(this._dpOpts);
+            }
         },
 
         /* ── Loyalty Rules table ─────────────────────────────────────── */
@@ -1405,16 +1416,22 @@
             });
 
             // Loyalty Programme toggle (phase 3)
-            this.$ctx.on('change', '#ap-sc-join-loyalty', function () {
+            this.$ctx.on('change', '#ap-sc-join-loyalty', (e) => {
                 const $loyaltyFields = $('#ap-sc-loyalty-fields');
-                if ($(this).is(':checked')) {
+                if ($(e.target).is(':checked')) {
                     $('#ap-sc-loyalty-benefits').hide();
                     $loyaltyFields.slideDown(220);
+                    if (typeof $.fn.datepicker !== 'undefined') {
+                        $('#ap-sc-dob').datepicker(this._dpOpts || {});
+                    }
                 } else {
                     $loyaltyFields.slideUp(180);
                     $('#ap-sc-loyalty-benefits').show();
                     $loyaltyFields.find('select[name="gender"]').val('');
                     $loyaltyFields.find('input[name="dob"]').val('');
+                    if (typeof $.fn.datepicker !== 'undefined') {
+                        $('#ap-sc-dob').datepicker('destroy');
+                    }
                 }
             });
 
