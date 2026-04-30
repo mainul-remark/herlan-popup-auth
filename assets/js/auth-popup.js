@@ -1012,16 +1012,28 @@
             );
 
             const isMobile = () => window.innerWidth <= 768;
+            if (isMobile()) {
+                this.enhanceMobileAccountHome();
+            }
+
+            $(window).on('resize.apAccountDrawer', () => {
+                if (!isMobile() && $('.woocommerce-MyAccount-navigation').first().data('apEnhanced')) {
+                    window.location.reload();
+                }
+            });
 
             // History stack: [{url, title}, ...] — index 0 is the root page
             const navHistory = [];
 
             const openModal = (url, title) => {
+                const skeletonType = this.getAccountSkeletonType(url, title);
                 $('#ap-acct-modal-title').text(title || 'My Account');
-                $('#ap-acct-modal-body').html(
-                    '<div class="ap-acct-spinner-wrap"><span class="ap-acct-spinner"></span></div>'
-                );
-                $('#ap-acct-modal').addClass('open');
+                $('#ap-acct-modal-body').html(this.renderAccountSkeleton(skeletonType));
+                $('#ap-acct-modal')
+                    .removeClass('ap-acct-modal--orders ap-acct-modal--order-detail ap-acct-modal--account-details')
+                    .toggleClass('ap-acct-modal--orders', skeletonType === 'orders')
+                    .toggleClass('ap-acct-modal--order-detail', skeletonType === 'order-detail')
+                    .addClass('open');
                 $('body').addClass('ap-no-scroll');
                 // Show back-arrow only when we're deeper than the root page
                 $('#ap-acct-modal-back').toggleClass('ap-modal-can-go-back', navHistory.length > 1);
@@ -1034,9 +1046,13 @@
                     .then((html) => {
                         const doc = new DOMParser().parseFromString(html, 'text/html');
                         const el  = doc.querySelector('.woocommerce-MyAccount-content');
+                        if (el) {
+                            this.removeAccountBreadcrumbs(el);
+                        }
                         $('#ap-acct-modal-body').html(
                             el ? el.innerHTML : '<p class="ap-acct-error">Content not available.</p>'
                         );
+                        this.enhanceMobileAccountContent(url, title);
                     })
                     .catch(() => {
                         $('#ap-acct-modal-body').html(
@@ -1070,7 +1086,8 @@
                 }
                 e.preventDefault();
                 navHistory.length = 0; // Reset history for new top-level nav
-                navigateTo(href, $a.text().trim());
+                const navTitle = $a.find('.ap-mobile-account-text strong').text().trim() || $a.text().trim();
+                navigateTo(href, navTitle === 'Orders' ? 'My Orders' : navTitle);
             });
 
             // Back button: go to previous in-modal page, or close if at root
@@ -1086,6 +1103,65 @@
 
             // × button always closes
             $(document).on('click', '#ap-acct-modal-close', closeModal);
+            $(document).on('click', '.ap-account-details-cancel', closeModal);
+            $(document).on('click', '.ap-account-pass-toggle', (e) => {
+                e.preventDefault();
+                const $btn = $(e.currentTarget);
+                const $input = $btn.siblings('input[type="password"], input[type="text"]').first();
+                if (!$input.length) return;
+                const isPassword = $input.attr('type') === 'password';
+                $input.attr('type', isPassword ? 'text' : 'password');
+                $btn.attr('aria-pressed', isPassword ? 'true' : 'false');
+            });
+            $(document).on('click', '.ap-account-photo-btn', (e) => {
+                e.preventDefault();
+                const $btn = $(e.currentTarget);
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+                input.onchange = () => {
+                    const file = input.files && input.files[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append('action', 'auth_popup_upload_avatar');
+                    formData.append('nonce', AuthPopup.nonce);
+                    formData.append('avatar', file);
+
+                    const originalText = $btn.text();
+                    $btn.prop('disabled', true).addClass('is-loading').contents().filter(function() {
+                        return this.nodeType === 3;
+                    }).last().replaceWith('Uploading...');
+
+                    $.ajax({
+                        url: AuthPopup.ajaxUrl,
+                        method: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: (res) => {
+                            if (!res.success || !res.data || !res.data.url) {
+                                alert((res.data && res.data.message) || 'Upload failed. Please try again.');
+                                return;
+                            }
+                            AuthPopup.accountSummary = AuthPopup.accountSummary || {};
+                            AuthPopup.accountSummary.avatarUrl = res.data.url;
+                            $('.ap-account-details-avatar, .ap-mobile-account-avatar').html('<img src="' + $('<div>').text(res.data.url).html() + '" alt="">');
+                        },
+                        error: (xhr) => {
+                            const message = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                                ? xhr.responseJSON.data.message
+                                : 'Upload failed. Please try again.';
+                            alert(message);
+                        },
+                        complete: () => {
+                            $btn.prop('disabled', false).removeClass('is-loading').contents().filter(function() {
+                                return this.nodeType === 3;
+                            }).last().replaceWith(originalText);
+                        },
+                    });
+                };
+                input.click();
+            });
 
             // ESC key
             $(document).on('keydown.acct', (e) => {
@@ -1133,12 +1209,467 @@
 
                 if (isMyAccSub) {
                     e.preventDefault();
-                    navigateTo(href, $a.text().trim() || 'My Account');
+                    navigateTo(
+                        href,
+                        $a.find('.ap-mobile-order-main strong').text().trim() ||
+                        $a.text().trim() ||
+                        'My Account'
+                    );
                 }
             });
         },
 
         /* ── jQuery UI Datepicker ────────────────────────────────────── */
+        removeAccountBreadcrumbs(root) {
+            const selectors = [
+                '.woocommerce-breadcrumb',
+                '.rank-math-breadcrumb',
+                '.yoast-breadcrumb',
+                '.breadcrumb',
+                '.breadcrumbs',
+                '[typeof="BreadcrumbList"]',
+                '[aria-label="breadcrumb"]',
+                'nav.breadcrumb',
+                'nav.breadcrumbs',
+            ];
+
+            root.querySelectorAll(selectors.join(',')).forEach((el) => el.remove());
+        },
+
+        enhanceMobileAccountHome() {
+            const $nav = $('.woocommerce-MyAccount-navigation').first();
+            if (!$nav.length || $nav.data('apEnhanced')) return;
+
+            const summary = AuthPopup.accountSummary || {};
+            const esc = (value) => $('<div>').text(value || '').html();
+            const phone = summary.phone ? '+' + String(summary.phone).replace(/^\+/, '') : '';
+            const avatar = summary.avatarUrl
+                ? '<img src="' + esc(summary.avatarUrl) + '" alt="">'
+                : '<span>' + esc((summary.name || 'U').charAt(0).toUpperCase()) + '</span>';
+
+            $nav.data('apEnhanced', true).addClass('ap-mobile-account-nav');
+            $nav.before(
+                '<div class="ap-mobile-account-head">' +
+                    '<div class="ap-mobile-account-avatar">' + avatar + '</div>' +
+                    '<div class="ap-mobile-account-id">' +
+                        '<strong>' + esc(summary.name || AuthPopup.displayName || 'My Account') + '</strong>' +
+                        (phone ? '<span>' + esc(phone) + '</span>' : '') +
+                    '</div>' +
+                '</div>'
+            );
+
+            const iconMap = {
+                dashboard: 'sparkles',
+                memberships: 'sparkles',
+                membership: 'sparkles',
+                orders: 'bag',
+                'edit-address': 'pin',
+                addresses: 'pin',
+                'edit-account': 'id-card',
+                account: 'id-card',
+                'my-coupons': 'coupon',
+                coupons: 'coupon',
+                'my-store-credits': 'credit',
+                credits: 'credit',
+                wishlist: 'heart',
+                'customer-logout': 'logout',
+            };
+            const subtitleMap = {
+                dashboard: 'Overview',
+                memberships: 'Silver status',
+                membership: 'Silver status',
+                orders: 'Track & manage',
+                'edit-address': (summary.addressCount || 0) + ' saved',
+                addresses: (summary.addressCount || 0) + ' saved',
+                'edit-account': 'Edit profile',
+                account: 'Edit profile',
+                wishlist: (summary.wishlistCount || 0) + ' saved items',
+            };
+            const iconSvg = {
+                sparkles: '<svg viewBox="0 0 24 24"><path d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 16l-1.7-5L6 9.3l4.3-1.7L12 3z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14z"/></svg>',
+                bag: '<svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8a3 3 0 016 0"/></svg>',
+                pin: '<svg viewBox="0 0 24 24"><path d="M12 21s6-5.2 6-11a6 6 0 10-12 0c0 5.8 6 11 6 11z"/><circle cx="12" cy="10" r="2"/></svg>',
+                user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg>',
+                'id-card': '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 17a3.8 3.8 0 017 0"/><path d="M14 10h5M14 13h4M14 16h3"/></svg>',
+                coupon: '<svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 010 4v3a2 2 0 01-2 2H6a2 2 0 01-2-2v-3a2 2 0 010-4V7z"/><path d="M9 9h.01M15 15h.01M15 9l-6 6"/></svg>',
+                credit: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg>',
+                heart: '<svg viewBox="0 0 24 24"><path d="M20.5 8.5c0 5-8.5 10-8.5 10s-8.5-5-8.5-10A4.7 4.7 0 018 4.8c1.6 0 3 .8 4 2 1-1.2 2.4-2 4-2a4.7 4.7 0 014.5 3.7z"/></svg>',
+                logout: '<svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5v16h-5"/></svg>',
+            };
+
+            $nav.find('li').each((_, li) => {
+                const $li = $(li);
+                const $a = $li.children('a').first();
+                if (!$a.length) return;
+
+                const endpointClass = ($li.attr('class') || '').split(/\s+/).filter((className) => {
+                    return className.indexOf('woocommerce-MyAccount-navigation-link--') === 0;
+                })[0] || '';
+                const endpoint = endpointClass.replace('woocommerce-MyAccount-navigation-link--', '');
+                const key = endpoint || $.trim($a.text()).toLowerCase().replace(/\s+/g, '-');
+                const isLogout = key === 'customer-logout' || ($a.attr('href') || '').indexOf('customer-logout') !== -1;
+                const rawLabel = $.trim($a.text());
+                const iconKey = iconMap[key] || 'user';
+                const subtitle = subtitleMap[key] || '';
+                const badge = key === 'orders' && Number(summary.orderCount) > 0
+                    ? '<span class="ap-mobile-account-badge">' + Number(summary.orderCount) + '</span>'
+                    : '';
+
+                $li.toggleClass('ap-mobile-account-logout', isLogout);
+                $a.html(
+                    '<span class="ap-mobile-account-icon ap-mobile-account-icon--' + esc(iconKey) + '">' + iconSvg[iconKey] + '</span>' +
+                    '<span class="ap-mobile-account-text"><strong>' + esc(rawLabel) + '</strong>' +
+                        (subtitle && !isLogout ? '<small>' + esc(subtitle) + '</small>' : '') +
+                    '</span>' +
+                    badge +
+                    '<span class="ap-mobile-account-arrow">&rsaquo;</span>'
+                );
+            });
+
+            const $accountItems = $nav.find('li').not('.woocommerce-MyAccount-navigation-link--dashboard, .woocommerce-MyAccount-navigation-link--wishlist, .ap-mobile-account-logout');
+            $accountItems.first().addClass('ap-mobile-account-first');
+            $accountItems.last().addClass('ap-mobile-account-last');
+
+            $('body').addClass('ap-mobile-account-ready');
+        },
+
+        getAccountSkeletonType(url, title) {
+            const rawUrl = String(url || '');
+            const rawTitle = String(title || '').toLowerCase();
+
+            if (rawUrl.indexOf('/view-order/') !== -1) return 'order-detail';
+            if (rawUrl.indexOf('/orders') !== -1 || rawTitle === 'orders' || rawTitle === 'my orders') return 'orders';
+            if (rawUrl.indexOf('/edit-address') !== -1 || rawTitle.indexOf('address') !== -1) return 'addresses';
+            if (rawUrl.indexOf('/edit-account') !== -1 || rawTitle.indexOf('account') !== -1) return 'account';
+            return 'default';
+        },
+
+        renderAccountSkeleton(type) {
+            const line = (className = '') => '<span class="ap-skel-line ' + className + '"></span>';
+
+            if (type === 'orders') {
+                return '<div class="ap-skel ap-skel-orders">' +
+                    [1, 2, 3, 4, 5].map(() =>
+                        '<div class="ap-skel-order-card">' +
+                            '<div>' + line('ap-skel-w-42') + line('ap-skel-w-30') + line('ap-skel-w-22 ap-skel-gap-lg') + '</div>' +
+                            '<div class="ap-skel-order-side">' + line('ap-skel-pill') + line('ap-skel-w-24 ap-skel-gap-lg') + '</div>' +
+                        '</div>'
+                    ).join('') +
+                '</div>';
+            }
+
+            if (type === 'order-detail') {
+                const item = '<div class="ap-skel-detail-item"><span class="ap-skel-thumb"></span><div>' + line('ap-skel-w-44') + line('ap-skel-w-56') + '</div><span class="ap-skel-line ap-skel-w-20"></span></div>';
+                return '<div class="ap-skel ap-skel-detail">' +
+                    '<section>' + line('ap-skel-label') + '<div class="ap-skel-track-card"><div class="ap-skel-track-steps"><span></span><span></span><span></span><span></span><span></span></div>' + line('ap-skel-w-88') + line('ap-skel-w-64') + '</div></section>' +
+                    '<section>' + line('ap-skel-label') + '<div class="ap-skel-detail-card">' + item + item + '</div></section>' +
+                    '<section>' + line('ap-skel-label') + '<div class="ap-skel-summary-card">' + line('ap-skel-w-92') + line('ap-skel-w-86') + line('ap-skel-w-78') + line('ap-skel-w-94 ap-skel-total') + '</div></section>' +
+                    '<section>' + line('ap-skel-label') + '<div class="ap-skel-address-card">' + line('ap-skel-w-34') + line('ap-skel-w-74') + line('ap-skel-w-68') + line('ap-skel-w-48') + '</div></section>' +
+                '</div>';
+            }
+
+            if (type === 'addresses') {
+                return '<div class="ap-skel ap-skel-addresses">' +
+                    '<div class="ap-skel-address-head">' + line('ap-skel-w-38') + line('ap-skel-button') + '</div>' +
+                    [1, 2].map(() =>
+                        '<div class="ap-skel-address-card"><div class="ap-skel-address-top"><span class="ap-skel-icon"></span>' + line('ap-skel-w-36') + '</div>' + line('ap-skel-w-62') + line('ap-skel-w-78') + line('ap-skel-w-44') + '</div>'
+                    ).join('') +
+                '</div>';
+            }
+
+            return '<div class="ap-skel ap-skel-account">' +
+                [1, 2, 3, 4].map(() =>
+                    '<div class="ap-skel-menu-row"><span class="ap-skel-icon"></span><div>' + line('ap-skel-w-40') + line('ap-skel-w-28') + '</div><span class="ap-skel-dot"></span></div>'
+                ).join('') +
+            '</div>';
+        },
+
+        enhanceMobileAccountContent(url, title) {
+            if (this.enhanceMobileOrderDetail(url, title)) return;
+            if (this.enhanceMobileAccountDetails(url, title)) return;
+
+            const isOrders = (url || '').indexOf('/orders') !== -1 || String(title || '').toLowerCase() === 'orders';
+            if (!isOrders) return;
+
+            const $body = $('#ap-acct-modal-body');
+            const $table = $body.find('.woocommerce-orders-table').first();
+            if (!$table.length) return;
+
+            const esc = (value) => $('<div>').text(value || '').html();
+            const cards = [];
+
+            $table.find('tbody tr').each((_, row) => {
+                const $row = $(row);
+                const $numberCell = $row.find('.woocommerce-orders-table__cell-order-number').first();
+                const $dateCell = $row.find('.woocommerce-orders-table__cell-order-date').first();
+                const $statusCell = $row.find('.woocommerce-orders-table__cell-order-status').first();
+                const $totalCell = $row.find('.woocommerce-orders-table__cell-order-total').first();
+                const $orderLink = $numberCell.find('a').first();
+
+                const href = $orderLink.attr('href') || $row.find('.woocommerce-button.view').attr('href') || '#';
+                const number = $.trim($orderLink.text() || $numberCell.text());
+                const date = $.trim($dateCell.find('time').text() || $dateCell.text());
+                const status = $.trim($statusCell.text());
+                const totalText = $.trim($totalCell.text()).replace(/\s+/g, ' ');
+                const amount = $.trim($totalCell.find('.woocommerce-Price-amount').last().text()) || totalText.replace(/\s+for\s+\d+\s+items?.*$/i, '');
+                const itemMatch = totalText.match(/(\d+)\s+items?/i);
+                const itemCount = itemMatch ? itemMatch[1] + ' item' + (itemMatch[1] === '1' ? '' : 's') : '';
+                const statusClass = status.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default';
+
+                if (!number) return;
+
+                cards.push(
+                    '<a class="ap-mobile-order-card" href="' + esc(href) + '">' +
+                        '<span class="ap-mobile-order-main">' +
+                            '<strong>' + esc(number) + '</strong>' +
+                            (date ? '<small>' + esc(date) + '</small>' : '') +
+                            (itemCount ? '<em>' + esc(itemCount) + '</em>' : '') +
+                        '</span>' +
+                        '<span class="ap-mobile-order-side">' +
+                            (status ? '<small class="ap-mobile-order-status ap-mobile-order-status--' + esc(statusClass) + '">' + esc(status) + '</small>' : '') +
+                            (amount ? '<strong>' + esc(amount) + '</strong>' : '') +
+                        '</span>' +
+                    '</a>'
+                );
+            });
+
+            if (!cards.length) return;
+
+            $('#ap-acct-modal').addClass('ap-acct-modal--orders');
+            $body.html('<div class="ap-mobile-orders-list">' + cards.join('') + '</div>');
+        },
+
+        enhanceMobileOrderDetail(url, title) {
+            const isDetail = (url || '').indexOf('/view-order/') !== -1;
+            if (!isDetail) return false;
+
+            const $body = $('#ap-acct-modal-body');
+            const $details = $body.find('.woocommerce-order-details').first();
+            const $itemsTable = $body.find('.woocommerce-table--order-details, .order_details').first();
+            if (!$details.length && !$itemsTable.length) return false;
+
+            const esc = (value) => $('<div>').text(value || '').html();
+            const clean = (value) => $.trim(String(value || '').replace(/\s+/g, ' '));
+            const pageText = clean($body.text());
+            const orderMatch = pageText.match(/Order\s+#?([A-Z0-9-]+)/i) || String(url || '').match(/view-order\/(\d+)/i);
+            const orderNo = clean(title).match(/^#/) ? clean(title) : '#' + (orderMatch ? orderMatch[1] : clean(title || 'Order'));
+            const statusMatch = pageText.match(/currently\s+([A-Za-z -]+)\./i);
+            const status = statusMatch ? clean(statusMatch[1]) : '';
+
+            $('#ap-acct-modal-title').text(orderNo);
+
+            const items = [];
+            const fallbackThumb = '<svg viewBox="0 0 24 24"><path d="M9 4l3 2 3-2 4 2-2 5-2-1v10H9V10l-2 1-2-5 4-2z"/></svg>';
+            $itemsTable.find('tbody tr, tr.woocommerce-table__line-item, tr.order_item').each((_, row) => {
+                const $row = $(row);
+                const $nameCell = $row.find('.woocommerce-table__product-name, .product-name').first();
+                const $totalCell = $row.find('.woocommerce-table__product-total, .product-total').first();
+                if (!$nameCell.length || !$totalCell.length) return;
+
+                const name = clean($nameCell.find('a').first().text() || $nameCell.clone().children().remove().end().text() || $nameCell.text()).replace(/\s*[×x]\s*\d+\s*$/, '');
+                const qtyMatch = $nameCell.text().match(/[×x]\s*(\d+)/);
+                const qty = qtyMatch ? qtyMatch[1] : '';
+                const meta = $nameCell.find('.wc-item-meta li, .wc-item-meta p, .variation dt, .variation dd').map((__, el) => clean($(el).text())).get().filter(Boolean).join(' · ');
+                const total = clean($totalCell.find('.woocommerce-Price-amount').last().text() || $totalCell.text());
+                if (!name) return;
+
+                const $thumbImg = $row.find('.product-thumbnail img, .woocommerce-table__product-thumbnail img, td.product-name img, .woocommerce-table__product-name img').first();
+                const thumbSrc = $thumbImg.attr('data-src') || $thumbImg.attr('src') || '';
+                const thumbHtml = thumbSrc
+                    ? '<img src="' + esc(thumbSrc) + '" alt="' + esc(name) + '" loading="lazy">'
+                    : fallbackThumb;
+
+                items.push(
+                    '<div class="ap-mobile-detail-item">' +
+                        '<span class="ap-mobile-detail-thumb">' + thumbHtml + '</span>' +
+                        '<span class="ap-mobile-detail-item-main"><strong>' + esc(name) + '</strong>' +
+                            '<small>' + esc([meta, qty ? 'Qty: ' + qty : ''].filter(Boolean).join(' · ')) + '</small></span>' +
+                        '<span class="ap-mobile-detail-price">' + esc(total) + '</span>' +
+                    '</div>'
+                );
+            });
+
+            const totals = [];
+            $itemsTable.find('tfoot tr').each((_, row) => {
+                const $row = $(row);
+                const label = clean($row.find('th').first().text()).replace(/:$/, '');
+                const value = clean($row.find('td').first().text());
+                if (!label || !value) return;
+                const isTotal = label.toLowerCase() === 'total';
+                totals.push(
+                    '<div class="ap-mobile-summary-row' + (isTotal ? ' ap-mobile-summary-row--total' : '') + '">' +
+                        '<span>' + esc(label) + '</span><strong>' + esc(value) + '</strong>' +
+                    '</div>'
+                );
+            });
+
+            const $address = $body.find('.woocommerce-customer-details address, address').first();
+            const addressHtml = $address.length
+                ? $address.html().replace(/<br\s*\/?>/gi, '\n').replace(/<\/?[^>]+>/g, '\n').split('\n').map(clean).filter(Boolean)
+                : [];
+
+            const trackingLine = pageText.match(/(Shipped via[^.]+Tracking:[^.]+)/i);
+            const trackingHtml = trackingLine
+                ? esc(trackingLine[1]).replace(/(Tracking:\s*)/i, '$1')
+                : (status ? 'Current status: <strong>' + esc(status) + '</strong>' : 'Order is being prepared.');
+
+            const baseSteps = ['Order Placed', 'Confirmed', 'Processing'];
+            const statusAlias = {
+                'pending': 0, 'pending payment': 0, 'placed': 0, 'order placed': 0, 'on hold': 0, 'on-hold': 0,
+                'confirmed': 1, 'approved': 1,
+                'processing': 2, 'in progress': 2, 'preparing': 2,
+                'shipped': 2, 'out for delivery': 2, 'in transit': 2, 'dispatched': 2,
+                'completed': 3, 'complete': 3, 'delivered': 3,
+                'cancelled': 3, 'canceled': 3, 'failed': 3,
+                'refunded': 3,
+            };
+            const resolveFinal = (key) => {
+                if (!key) return { label: 'Completed', tone: 'completed' };
+                if (key.indexOf('cancel') !== -1 || key === 'failed') return { label: 'Cancelled', tone: 'cancelled' };
+                if (key.indexOf('refund') !== -1) return { label: 'Refunded', tone: 'refunded' };
+                return { label: 'Completed', tone: 'completed' };
+            };
+            const statusKey = String(status || '').toLowerCase().trim();
+            let activeIndex = -1;
+            if (statusKey && Object.prototype.hasOwnProperty.call(statusAlias, statusKey)) {
+                activeIndex = statusAlias[statusKey];
+            } else if (statusKey) {
+                Object.keys(statusAlias).forEach((alias) => {
+                    if (statusKey.indexOf(alias) !== -1 && statusAlias[alias] > activeIndex) activeIndex = statusAlias[alias];
+                });
+                if (activeIndex === -1) {
+                    baseSteps.forEach((step, idx) => {
+                        if (statusKey.indexOf(step.toLowerCase()) !== -1 && idx > activeIndex) activeIndex = idx;
+                    });
+                }
+            }
+            if (activeIndex < 0) activeIndex = 0;
+            const finalStep = resolveFinal(statusKey);
+            const steps = baseSteps.concat([finalStep.label]);
+            const buildStepHtml = (stepLabels, idxActive, finalTone) => stepLabels.map((step, index) => {
+                const isLast = index === stepLabels.length - 1;
+                const cls = ['ap-mobile-track-step'];
+                if (index <= idxActive) cls.push('is-done');
+                if (index === idxActive) cls.push('is-current');
+                const isNegativeFinal = isLast && (finalTone === 'cancelled' || finalTone === 'refunded');
+                if (isLast && finalTone) cls.push('is-' + finalTone);
+                const mark = (index <= idxActive)
+                    ? (isNegativeFinal && index === idxActive ? '&#10005;' : '&#10003;')
+                    : '';
+                return '<span class="' + cls.join(' ') + '">' +
+                    '<i>' + mark + '</i><small>' + esc(step) + '</small>' +
+                '</span>';
+            }).join('');
+            const stepHtml = buildStepHtml(steps, activeIndex, finalStep.tone);
+
+            $('#ap-acct-modal').addClass('ap-acct-modal--order-detail');
+            $body.html(
+                '<div class="ap-mobile-detail-page">' +
+                    '<section class="ap-mobile-detail-section"><h3>ORDER TRACKING</h3>' +
+                        '<div class="ap-mobile-track-card"><div class="ap-mobile-track-steps">' + stepHtml + '</div>' +
+                        '<div class="ap-mobile-track-note">' + trackingHtml + '</div></div></section>' +
+                    (items.length ? '<section class="ap-mobile-detail-section"><h3>ITEMS ORDERED</h3><div class="ap-mobile-detail-card">' + items.join('') + '</div></section>' : '') +
+                    (totals.length ? '<section class="ap-mobile-detail-section"><h3>ORDER SUMMARY</h3><div class="ap-mobile-summary-card">' + totals.join('') + '</div></section>' : '') +
+                    (addressHtml.length ? '<section class="ap-mobile-detail-section"><h3>SHIPPING ADDRESS</h3><div class="ap-mobile-address-card">' + addressHtml.map((line, index) => index === 0 ? '<strong>' + esc(line) + '</strong>' : '<span>' + esc(line) + '</span>').join('') + '</div></section>' : '') +
+                '</div>'
+            );
+
+            const orderIdMatch = String(url || '').match(/view-order\/(\d+)/i);
+            const orderId = orderIdMatch ? parseInt(orderIdMatch[1], 10) : 0;
+            if (orderId && AuthPopup.ajaxUrl && AuthPopup.nonce) {
+                $.ajax({
+                    url: AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: { action: 'auth_popup_order_items', nonce: AuthPopup.nonce, order_id: orderId },
+                }).done((res) => {
+                    if (!res || !res.success || !res.data) return;
+                    const data = res.data;
+
+                    if (Array.isArray(data.items) && data.items.length) {
+                        const $itemEls = $body.find('.ap-mobile-detail-item');
+                        data.items.forEach((it, idx) => {
+                            const $el = $itemEls.eq(idx);
+                            if (!$el.length || !it.thumb) return;
+                            $el.find('.ap-mobile-detail-thumb').html('<img src="' + esc(it.thumb) + '" alt="' + esc(it.name || '') + '" loading="lazy">');
+                        });
+                    }
+
+                    const wcStatus = String(data.status || '').toLowerCase();
+                    if (wcStatus) {
+                        let next = -1;
+                        if (Object.prototype.hasOwnProperty.call(statusAlias, wcStatus)) next = statusAlias[wcStatus];
+                        else Object.keys(statusAlias).forEach((alias) => {
+                            if (wcStatus.indexOf(alias) !== -1 && statusAlias[alias] > next) next = statusAlias[alias];
+                        });
+                        if (next < 0) next = 0;
+                        const finalNext = resolveFinal(wcStatus);
+                        const newSteps = baseSteps.concat([finalNext.label]);
+                        const $track = $body.find('.ap-mobile-track-steps');
+                        if ($track.length) {
+                            $track.removeClass('is-completed is-cancelled is-refunded');
+                            if (next === newSteps.length - 1) $track.addClass('is-' + finalNext.tone);
+                            $track.html(buildStepHtml(newSteps, next, finalNext.tone));
+                        }
+                    }
+                });
+            }
+
+            return true;
+        },
+
+        enhanceMobileAccountDetails(url, title) {
+            const isAccount = (url || '').indexOf('/edit-account') !== -1 || String(title || '').toLowerCase().indexOf('account') !== -1;
+            if (!isAccount) return false;
+
+            const $body = $('#ap-acct-modal-body');
+            const $form = $body.find('form.woocommerce-EditAccountForm, form.edit-account').first();
+            if (!$form.length || $body.find('.ap-account-details-head').length) return false;
+
+            const summary = AuthPopup.accountSummary || {};
+            const esc = (value) => $('<div>').text(value || '').html();
+            const initialsSource = summary.name || $form.find('#account_display_name').val() || 'User';
+            const initials = initialsSource.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'U';
+            const avatar = summary.avatarUrl
+                ? '<img src="' + esc(summary.avatarUrl) + '" alt="">'
+                : '<span>' + esc(initials) + '</span>';
+            const name = summary.name || $form.find('#account_display_name').val() || '';
+            const email = summary.email || $form.find('#account_email').val() || '';
+            const eyeIcon = '<svg viewBox="0 0 24 24" fill="none"><path d="M1.5 12s3.8-6 10.5-6 10.5 6 10.5 6-3.8 6-10.5 6-10.5-6-10.5-6z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.7"/></svg>';
+
+            $('#ap-acct-modal').addClass('ap-acct-modal--account-details');
+            $form.before(
+                '<div class="ap-account-details-head">' +
+                    '<div class="ap-account-details-avatar-wrap">' +
+                        '<div class="ap-account-details-avatar">' + avatar + '</div>' +
+                        '<span class="ap-account-details-camera"><svg viewBox="0 0 24 24"><path d="M7 7l1.4-2h7.2L17 7h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2h2z"/><circle cx="12" cy="13" r="3"/></svg></span>' +
+                    '</div>' +
+                    '<div class="ap-account-details-id">' +
+                        '<strong>' + esc(name) + '</strong>' +
+                        (email ? '<span>' + esc(email) + '</span>' : '') +
+                        '<button type="button" class="ap-account-photo-btn"><svg viewBox="0 0 24 24"><path d="M12 5v10M8 9l4-4 4 4"/><path d="M5 19h14"/></svg>Upload photo</button>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $form.addClass('ap-account-details-form');
+            $form.prepend('<div class="ap-account-section-title">Personal info</div>');
+            $form.find('fieldset legend').text('Change password');
+
+            $form.find('input[type="password"]').each((_, input) => {
+                const $input = $(input);
+                if ($input.parent('.ap-account-pass-wrap').length) return;
+                $input.wrap('<span class="ap-account-pass-wrap"></span>');
+                $input.after('<button type="button" class="ap-account-pass-toggle" aria-label="Show password" aria-pressed="false">' + eyeIcon + '</button>');
+            });
+
+            const $saveRow = $form.children('p').last();
+            if ($saveRow.length && !$saveRow.find('.ap-account-details-cancel').length) {
+                $saveRow.prepend('<button type="button" class="ap-account-details-cancel">Cancel</button>');
+            }
+
+            return true;
+        },
+
         initDatepicker() {
             if (typeof $.fn.datepicker === 'undefined') return;
 

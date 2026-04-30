@@ -6,6 +6,8 @@ class Auth_Popup_Public_Frontend {
     public static function init(): void {
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
         add_action( 'wp_footer',          [ __CLASS__, 'render_popup'   ] );
+        add_action( 'wp_ajax_auth_popup_upload_avatar', [ __CLASS__, 'ajax_upload_avatar' ] );
+        add_action( 'wp_ajax_auth_popup_order_items',   [ __CLASS__, 'ajax_order_items'   ] );
         add_shortcode( 'auth_popup_button', [ __CLASS__, 'shortcode_button'      ] );
         add_shortcode( 'auth_popup_form',   [ __CLASS__, 'shortcode_inline_form' ] );
 
@@ -119,6 +121,7 @@ class Auth_Popup_Public_Frontend {
             'enableOtp'       => $s['enable_otp_login'],
             'isLoggedIn'      => is_user_logged_in() ? '1' : '0',
             'displayName'     => is_user_logged_in() ? wp_get_current_user()->display_name : '',
+            'accountSummary'  => self::get_account_summary(),
             'loyaltyNonce'    => wp_create_nonce( 'herlan_loyalty_nonce' ),
             'isInlineForm'    => $is_inline_page ? '1' : '0',
             'myAccountUrl'    => function_exists( 'wc_get_page_permalink' )
@@ -258,6 +261,180 @@ class Auth_Popup_Public_Frontend {
         }
 
         return $value;
+    }
+
+    private static function get_account_summary(): array {
+        if ( ! is_user_logged_in()
+             || ! function_exists( 'is_account_page' )
+             || ! is_account_page() ) {
+            return [];
+        }
+
+        $user_id   = get_current_user_id();
+        $user      = wp_get_current_user();
+        $phone     = Auth_Popup_User_Auth::get_user_phone( $user_id );
+        $addresses = Auth_Popup_Address_Manager::get_addresses( $user_id );
+
+        $order_count = 0;
+        if ( function_exists( 'wc_get_customer_order_count' ) ) {
+            $order_count = (int) wc_get_customer_order_count( $user_id );
+        }
+
+        $wishlist_count = 0;
+        if ( function_exists( 'yith_wcwl_count_products' ) ) {
+            $wishlist_count = (int) yith_wcwl_count_products();
+        } elseif ( function_exists( 'tinv_wishlist_get' ) ) {
+            $wishlist = tinv_wishlist_get();
+            if ( is_object( $wishlist ) && method_exists( $wishlist, 'count_products' ) ) {
+                $wishlist_count = (int) $wishlist->count_products();
+            }
+        }
+
+        return [
+            'name'          => $user->display_name ?: $user->user_login,
+            'email'         => $user->user_email,
+            'phone'         => $phone,
+            'avatarUrl'     => self::get_user_avatar_url( $user_id ),
+            'orderCount'    => $order_count,
+            'addressCount'  => count( $addresses ),
+            'wishlistCount' => $wishlist_count,
+        ];
+    }
+
+    private static function get_user_avatar_url( int $user_id ): string {
+        global $wpdb;
+
+        $meta_keys = [
+            'profile_image',
+            'profile_image_url',
+            'avatar',
+            'avatar_url',
+            'user_avatar',
+            'user_avatar_url',
+            'wp_user_avatar',
+            'simple_local_avatar',
+        ];
+
+        foreach ( $meta_keys as $key ) {
+            $value = get_user_meta( $user_id, $key, true );
+            if ( is_array( $value ) ) {
+                $value = $value['full'] ?? $value['96'] ?? $value['url'] ?? $value['media_id'] ?? $value['attachment_id'] ?? '';
+            }
+
+            if ( is_numeric( $value ) ) {
+                $url = wp_get_attachment_image_url( (int) $value, 'thumbnail' );
+                if ( $url ) {
+                    return $url;
+                }
+            }
+
+            if ( is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
+                return esc_url_raw( $value );
+            }
+        }
+
+        $profiles_table = $wpdb->prefix . 'auth_popup_user_profiles';
+        $profile_avatar = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(NULLIF(google_avatar, ''), NULLIF(facebook_avatar, '')) FROM {$profiles_table} WHERE user_id = %d LIMIT 1",
+            $user_id
+        ) );
+
+        if ( is_string( $profile_avatar ) && filter_var( $profile_avatar, FILTER_VALIDATE_URL ) ) {
+            return esc_url_raw( $profile_avatar );
+        }
+
+        return get_avatar_url( $user_id, [ 'size' => 96 ] );
+    }
+
+    public static function ajax_upload_avatar(): void {
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Please log in again.', 'auth-popup' ) ], 401 );
+        }
+
+        check_ajax_referer( 'auth_popup_nonce', 'nonce' );
+
+        if ( empty( $_FILES['avatar'] ) || ! is_array( $_FILES['avatar'] ) ) {
+            wp_send_json_error( [ 'message' => __( 'Please choose an image.', 'auth-popup' ) ], 400 );
+        }
+
+        $file = $_FILES['avatar'];
+        if ( ! empty( $file['size'] ) && (int) $file['size'] > 3 * MB_IN_BYTES ) {
+            wp_send_json_error( [ 'message' => __( 'Image must be 3MB or smaller.', 'auth-popup' ) ], 400 );
+        }
+
+        $type = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
+        if ( empty( $type['type'] ) || 0 !== strpos( $type['type'], 'image/' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Please upload a valid image file.', 'auth-popup' ) ], 400 );
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $upload = wp_handle_upload( $file, [
+            'test_form' => false,
+            'mimes'     => [
+                'jpg|jpeg|jpe' => 'image/jpeg',
+                'png'          => 'image/png',
+                'gif'          => 'image/gif',
+                'webp'         => 'image/webp',
+            ],
+        ] );
+
+        if ( isset( $upload['error'] ) ) {
+            wp_send_json_error( [ 'message' => $upload['error'] ], 400 );
+        }
+
+        $url = esc_url_raw( $upload['url'] ?? '' );
+        if ( ! $url ) {
+            wp_send_json_error( [ 'message' => __( 'Upload failed. Please try again.', 'auth-popup' ) ], 500 );
+        }
+
+        update_user_meta( get_current_user_id(), 'profile_image_url', $url );
+
+        wp_send_json_success( [
+            'url'     => $url,
+            'message' => __( 'Photo updated.', 'auth-popup' ),
+        ] );
+    }
+
+    public static function ajax_order_items(): void {
+        if ( ! is_user_logged_in() ) {
+            wp_send_json_error( [ 'message' => __( 'Please log in again.', 'auth-popup' ) ], 401 );
+        }
+
+        check_ajax_referer( 'auth_popup_nonce', 'nonce' );
+
+        $order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+        if ( ! $order_id || ! function_exists( 'wc_get_order' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Invalid order.', 'auth-popup' ) ], 400 );
+        }
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order || (int) $order->get_user_id() !== get_current_user_id() ) {
+            wp_send_json_error( [ 'message' => __( 'Order not found.', 'auth-popup' ) ], 404 );
+        }
+
+        $items = [];
+        foreach ( $order->get_items() as $item ) {
+            $product   = $item->get_product();
+            $thumb_id  = $product ? $product->get_image_id() : 0;
+            $thumb_url = $thumb_id ? wp_get_attachment_image_url( (int) $thumb_id, 'thumbnail' ) : '';
+            if ( ! $thumb_url && function_exists( 'wc_placeholder_img_src' ) ) {
+                $thumb_url = wc_placeholder_img_src( 'thumbnail' );
+            }
+
+            $items[] = [
+                'product_id' => $product ? (int) $product->get_id() : 0,
+                'name'       => wp_strip_all_tags( $item->get_name() ),
+                'qty'        => (int) $item->get_quantity(),
+                'thumb'      => esc_url_raw( $thumb_url ),
+            ];
+        }
+
+        wp_send_json_success( [
+            'order_id' => $order_id,
+            'status'   => $order->get_status(),
+            'items'    => $items,
+        ] );
     }
 
     public static function shortcode_button( array $atts ): string {

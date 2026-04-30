@@ -131,10 +131,16 @@
     /**
      * Use a MutationObserver to detect when the address book container is
      * injected into the DOM by the mobile modal (auth-popup.js fetch flow).
-     * Fires loadMyAccountAddresses() exactly once when the node appears.
+     * The modal replaces its body on every navigation, so keep watching and
+     * reload each newly inserted address container.
      */
     function watchForMyAccountContainer() {
         if ( ! window.MutationObserver ) return;
+
+        var current = document.getElementById( 'aab-my-account-addresses' );
+        if ( current ) {
+            loadMyAccountAddresses();
+        }
 
         var observer = new MutationObserver( function ( mutations ) {
             for ( var i = 0; i < mutations.length; i++ ) {
@@ -146,7 +152,6 @@
                         ? node
                         : node.querySelector( '#aab-my-account-addresses' );
                     if ( found ) {
-                        observer.disconnect();
                         loadMyAccountAddresses();
                         return;
                     }
@@ -162,7 +167,7 @@
     ══════════════════════════════════════════════════════════════════ */
 
     function loadMyAccountAddresses() {
-        setMyAccountWrap( '<div class="aab-inline-loading">Loading addresses&hellip;</div>' );
+        setMyAccountWrap( addressBookSkeleton() );
 
         $.post( cfg.ajaxUrl, { action: 'auth_popup_get_addresses', nonce: cfg.nonce } )
             .done( function ( res ) {
@@ -183,6 +188,16 @@
         if ( el ) {
             el.innerHTML = html;
         }
+    }
+
+    function addressBookSkeleton() {
+        return [
+            '<div class="aab-skel aab-skel-ma">',
+            '  <div class="aab-skel-head"><span class="aab-skel-line aab-skel-w-36"></span><span class="aab-skel-btn"></span></div>',
+            '  <div class="aab-skel-card"><div class="aab-skel-card-top"><span class="aab-skel-icon"></span><span class="aab-skel-line aab-skel-w-34"></span></div><span class="aab-skel-line aab-skel-w-70"></span><span class="aab-skel-line aab-skel-w-82"></span><span class="aab-skel-line aab-skel-w-48"></span></div>',
+            '  <div class="aab-skel-card"><div class="aab-skel-card-top"><span class="aab-skel-icon"></span><span class="aab-skel-line aab-skel-w-42"></span></div><span class="aab-skel-line aab-skel-w-64"></span><span class="aab-skel-line aab-skel-w-76"></span><span class="aab-skel-line aab-skel-w-40"></span></div>',
+            '</div>',
+        ].join( '' );
     }
 
     function renderMyAccountList( addresses ) {
@@ -329,7 +344,7 @@
 
     /* ── Load addresses from server ─────────────────────────────────── */
     function loadAddresses( applyDefault ) {
-        setWrap( '<div class="aab-inline-loading">Loading addresses&hellip;</div>' );
+        setWrap( inlineAddressSkeleton() );
 
         $.post( cfg.ajaxUrl, { action: 'auth_popup_get_addresses', nonce: cfg.nonce } )
             .done( function ( res ) {
@@ -370,6 +385,15 @@
 
     function setWrap( html ) {
         $( '#aab-section-desktop .aab-card-list-wrap, #aab-section-mobile .aab-card-list-wrap' ).html( html );
+    }
+
+    function inlineAddressSkeleton() {
+        return [
+            '<div class="aab-skel aab-skel-inline">',
+            '  <div class="aab-skel-inline-row"><span class="aab-skel-dot"></span><span class="aab-skel-icon"></span><div><span class="aab-skel-line aab-skel-w-42"></span><span class="aab-skel-line aab-skel-w-78"></span></div></div>',
+            '  <div class="aab-skel-inline-row"><span class="aab-skel-dot"></span><span class="aab-skel-icon"></span><div><span class="aab-skel-line aab-skel-w-36"></span><span class="aab-skel-line aab-skel-w-70"></span></div></div>',
+            '</div>',
+        ].join( '' );
     }
 
     function markSelected( id ) {
