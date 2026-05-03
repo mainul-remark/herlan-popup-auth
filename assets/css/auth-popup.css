@@ -390,13 +390,13 @@
 }
 
 .ap-btn-primary {
-    background: var(--herlan-primary-color, #eb161e);
+    background: var(--ap-text, #eb161e);
     color: #fff;
     margin-top: 4px;
     box-shadow: 0 4px 18px rgba(235,22,30,.22);
 }
 .ap-btn-primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--herlan-primary-color, #eb161e) 82%, #000);
+    background: color-mix(in srgb, var(--ap-text, #eb161e) 82%, #000);
     box-shadow: 0 6px 22px rgba(235,22,30,.32);
 }
 
@@ -863,7 +863,7 @@
 .ui-datepicker-calendar td a:hover { background: var(--ap-input-bg); }
 .ui-datepicker-calendar .ui-state-active,
 .ui-datepicker-calendar .ui-state-active:hover {
-    background: var(--herlan-primary-color, #eb161e) !important;
+    background: var(--ap-text, #eb161e) !important;
     color: #fff !important;
 }
 .ui-datepicker-calendar .ui-datepicker-today a {
@@ -889,18 +889,43 @@
 }
 
 /* ── My Account Page Title ───────────────────────────────── */
-body.woocommerce-account .entry-title {
-    text-align: center;
-}
+/*body.woocommerce-account .entry-title {*/
+/*    text-align: center;*/
+/*}*/
 
 /* ── Mobile Account Content Modal ────────────────────────── */
 #ap-acct-modal { display: none; }
+
+@media (min-width: 769px) {
+    .ap-mobile-account-head {
+        display: none !important;
+    }
+
+    .woocommerce-MyAccount-navigation.ap-mobile-account-nav .ap-mobile-account-icon,
+    .woocommerce-MyAccount-navigation.ap-mobile-account-nav .ap-mobile-account-badge,
+    .woocommerce-MyAccount-navigation.ap-mobile-account-nav .ap-mobile-account-arrow {
+        display: none !important;
+    }
+}
 
 @media (max-width: 768px) {
 
     /* Hide page content on account pages — nav stays visible  */
     body.woocommerce-account .woocommerce-MyAccount-content {
         display: none !important;
+    }
+
+    /* Prevent FOUC — keep my-account invisible until JS finishes mobile enhancement */
+    body.woocommerce-account:not(.ap-mobile-account-ready) .woocommerce-MyAccount {
+        opacity: 0;
+    }
+    body.woocommerce-account.ap-mobile-account-ready .woocommerce-MyAccount {
+        opacity: 1;
+        transition: opacity .12s ease-out;
+    }
+
+    .woocommerce-MyAccount-navigation-link.woocommerce-MyAccount-navigation-link--wishlist a {
+        margin-top: 15px;
     }
 
     /* Full-screen content modal slides in from the right */
@@ -959,11 +984,78 @@ body.woocommerce-account .entry-title {
     }
     .ap-acct-modal-close:hover { background: var(--ap-input-bg); color: var(--ap-text); }
 
+    #ap-acct-modal.ap-acct-modal--orders {
+        background: #fff;
+    }
+
+    #ap-acct-modal.ap-acct-modal--orders .ap-acct-modal-header {
+        border-bottom: 1px solid var(--ap-border);
+        padding: 14px 16px;
+    }
+
+    #ap-acct-modal.ap-acct-modal--orders .ap-acct-modal-back {
+        width: 32px;
+        height: 32px;
+        border: 1.5px solid var(--ap-border);
+        border-radius: 9px;
+        background: #fff;
+    }
+
+    #ap-acct-modal.ap-acct-modal--orders .ap-acct-modal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ap-text);
+    }
+
+    #ap-acct-modal.ap-acct-modal--orders .ap-acct-modal-close {
+        display: flex;
+    }
+
+    #ap-acct-modal.ap-acct-modal--order-detail {
+        background: #fff;
+    }
+
+    #ap-acct-modal.ap-acct-modal--order-detail .ap-acct-modal-header {
+        border-bottom: 1px solid var(--ap-border);
+        padding: 14px 16px;
+    }
+
+    #ap-acct-modal.ap-acct-modal--order-detail .ap-acct-modal-back {
+        width: 32px;
+        height: 32px;
+        border: 1.5px solid var(--ap-border);
+        border-radius: 9px;
+        background: #fff;
+    }
+
+    #ap-acct-modal.ap-acct-modal--order-detail .ap-acct-modal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--ap-text);
+    }
+
+    #ap-acct-modal.ap-acct-modal--order-detail .ap-acct-modal-close {
+        display: flex;
+    }
+
     .ap-acct-modal-body {
         flex: 1;
         overflow-y: auto;
         padding: 16px;
     }
+
+    .ap-acct-modal-body .woocommerce-breadcrumb,
+    .ap-acct-modal-body .rank-math-breadcrumb,
+    .ap-acct-modal-body .yoast-breadcrumb,
+    .ap-acct-modal-body .breadcrumb,
+    .ap-acct-modal-body .breadcrumbs,
+    .ap-acct-modal-body [typeof="BreadcrumbList"],
+    .ap-acct-modal-body [aria-label="breadcrumb"],
+    .ap-acct-modal-body nav.breadcrumb,
+    .ap-acct-modal-body nav.breadcrumbs {
+        display: none !important;
+    }
+
     .ap-acct-spinner-wrap {
         display: flex;
         justify-content: center;
@@ -974,7 +1066,7 @@ body.woocommerce-account .entry-title {
         display: inline-block;
         width: 22px; height: 22px;
         border: 3px solid var(--ap-border);
-        border-top-color: var(--herlan-primary-color, #eb161e);
+        border-top-color: var(--ap-text, #eb161e);
         border-radius: 50%;
         animation: ap-spin .7s linear infinite;
     }
@@ -984,6 +1076,1315 @@ body.woocommerce-account .entry-title {
         font-size: .875rem;
         padding: 32px 16px;
         font-family: var(--ap-font);
+    }
+
+    .ap-skel {
+        --ap-skel-base: #f3f0ec;
+        --ap-skel-shine: #fbfaf8;
+        display: grid;
+        gap: 10px;
+    }
+
+    .ap-skel-line,
+    .ap-skel-icon,
+    .ap-skel-thumb,
+    .ap-skel-dot,
+    .ap-skel-track-steps span {
+        display: block;
+        position: relative;
+        overflow: hidden;
+        background: var(--ap-skel-base);
+    }
+
+    .ap-skel-line::after,
+    .ap-skel-icon::after,
+    .ap-skel-thumb::after,
+    .ap-skel-dot::after,
+    .ap-skel-track-steps span::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, var(--ap-skel-shine), transparent);
+        animation: ap-skeleton-shimmer 1.15s infinite;
+    }
+
+    .ap-skel-line {
+        width: 60%;
+        height: 12px;
+        border-radius: 999px;
+        margin: 0 0 8px;
+    }
+
+    .ap-skel-icon,
+    .ap-skel-thumb {
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        flex: 0 0 auto;
+    }
+
+    .ap-skel-thumb {
+        width: 44px;
+        height: 44px;
+    }
+
+    .ap-skel-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+    }
+
+    .ap-skel-w-20 { width: 20%; }
+    .ap-skel-w-22 { width: 22%; }
+    .ap-skel-w-24 { width: 24%; }
+    .ap-skel-w-28 { width: 28%; }
+    .ap-skel-w-30 { width: 30%; }
+    .ap-skel-w-34 { width: 34%; }
+    .ap-skel-w-36 { width: 36%; }
+    .ap-skel-w-38 { width: 38%; }
+    .ap-skel-w-40 { width: 40%; }
+    .ap-skel-w-42 { width: 42%; }
+    .ap-skel-w-44 { width: 44%; }
+    .ap-skel-w-48 { width: 48%; }
+    .ap-skel-w-56 { width: 56%; }
+    .ap-skel-w-62 { width: 62%; }
+    .ap-skel-w-64 { width: 64%; }
+    .ap-skel-w-68 { width: 68%; }
+    .ap-skel-w-74 { width: 74%; }
+    .ap-skel-w-78 { width: 78%; }
+    .ap-skel-w-86 { width: 86%; }
+    .ap-skel-w-88 { width: 88%; }
+    .ap-skel-w-92 { width: 92%; }
+    .ap-skel-w-94 { width: 94%; }
+    .ap-skel-gap-lg { margin-top: 22px; }
+
+    .ap-skel-pill {
+        width: 64px;
+        height: 18px;
+        border-radius: 999px;
+    }
+
+    .ap-skel-button {
+        width: 112px;
+        height: 34px;
+        border-radius: 999px;
+        margin: 0;
+    }
+
+    .ap-skel-label {
+        width: 106px;
+        height: 10px;
+        margin-bottom: 8px;
+    }
+
+    .ap-skel-order-card {
+        min-height: 89px;
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px;
+        border: 1px solid #eee8e2;
+        border-radius: 14px;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    .ap-skel-order-card > div:first-child {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .ap-skel-order-side {
+        width: 84px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .ap-skel-order-side .ap-skel-line {
+        margin-left: auto;
+    }
+
+    .ap-skel-detail {
+        gap: 24px;
+    }
+
+    .ap-skel-detail section {
+        display: grid;
+        gap: 0;
+    }
+
+    .ap-skel-track-card,
+    .ap-skel-detail-card,
+    .ap-skel-summary-card,
+    .ap-skel-address-card,
+    .ap-skel-address-card {
+        border: 1px solid #eee8e2;
+        border-radius: 14px;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    .ap-skel-track-card {
+        padding: 22px 14px 15px;
+    }
+
+    .ap-skel-track-steps {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        padding-bottom: 18px;
+        margin-bottom: 14px;
+        border-bottom: 1px solid #f0ebe6;
+    }
+
+    .ap-skel-track-steps span {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin: 0 auto;
+    }
+
+    .ap-skel-detail-card {
+        overflow: hidden;
+    }
+
+    .ap-skel-detail-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 15px;
+        border-bottom: 1px solid #f0ebe6;
+    }
+
+    .ap-skel-detail-item:last-child {
+        border-bottom: 0;
+    }
+
+    .ap-skel-detail-item > div {
+        flex: 1;
+    }
+
+    .ap-skel-summary-card,
+    .ap-skel-address-card {
+        padding: 16px 15px;
+    }
+
+    .ap-skel-summary-card .ap-skel-line {
+        height: 13px;
+    }
+
+    .ap-skel-summary-card .ap-skel-total {
+        height: 16px;
+        margin-top: 14px;
+    }
+
+    .ap-skel-address-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 2px;
+    }
+
+    .ap-skel-address-card {
+        padding: 15px;
+    }
+
+    .ap-skel-address-top,
+    .ap-skel-menu-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .ap-skel-address-top {
+        margin-bottom: 12px;
+    }
+
+    .ap-skel-menu-row {
+        min-height: 59px;
+        padding: 10px 14px;
+        border: 1px solid #eee8e2;
+        border-radius: 14px;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    .ap-skel-menu-row > div {
+        flex: 1;
+    }
+
+    @keyframes ap-skeleton-shimmer {
+        100% {
+            transform: translateX(100%);
+        }
+    }
+
+    body.woocommerce-account {
+        background: #fff;
+    }
+
+    body.woocommerce-account .entry-title {
+        display: none;
+    }
+
+    body.woocommerce-account .woocommerce-breadcrumb,
+    body.woocommerce-account .rank-math-breadcrumb,
+    body.woocommerce-account .yoast-breadcrumb,
+    body.woocommerce-account .breadcrumb,
+    body.woocommerce-account .breadcrumbs,
+    body.woocommerce-account [typeof="BreadcrumbList"],
+    body.woocommerce-account [aria-label="breadcrumb"],
+    body.woocommerce-account nav.breadcrumb,
+    body.woocommerce-account nav.breadcrumbs {
+        display: none !important;
+    }
+
+    body.woocommerce-account .woocommerce {
+        width: 100%;
+        /*max-width: 360px;*/
+        margin: 0 auto;
+        /*padding: 28px 18px 36px;*/
+        box-sizing: border-box;
+        /*font-family: var(--ap-font);*/
+    }
+
+    .ap-mobile-account-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 8px 0 18px;
+    }
+
+    .ap-mobile-account-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: #e8e4df;
+        border: 1px solid #d8d2ca;
+        overflow: hidden;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8f8981;
+        font-weight: 700;
+        font-size: 20px;
+    }
+
+    .ap-mobile-account-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .ap-mobile-account-id {
+        min-width: 0;
+        display: grid;
+        gap: 3px;
+    }
+
+    .ap-mobile-account-id strong {
+        color: #090909;
+        font-size: 17px;
+        line-height: 1.2;
+        font-weight: 800;
+    }
+
+    .ap-mobile-account-id span {
+        color: #8d837c;
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    .ap-mobile-account-nav {
+        float: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .ap-mobile-account-nav ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .ap-mobile-account-nav ul::before {
+        content: "ACCOUNT";
+        display: block;
+        color: #b5a9a2;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .14em;
+        margin: 0 0 8px;
+    }
+
+    .ap-mobile-account-nav li {
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    .ap-mobile-account-nav li:last-child a{
+        margin-top: 15px;
+    }
+
+    .ap-mobile-account-nav li.woocommerce-MyAccount-navigation-link--dashboard {
+        display: none;
+    }
+
+    .ap-mobile-account-nav li a {
+        min-height: 64px;
+        display: flex !important;
+        align-items: center;
+        gap: 14px;
+        color: #050505 !important;
+        text-decoration: none !important;
+        background: #fff !important;
+        border: 1px solid #eee8e2;
+        border-bottom-width: 0;
+        padding: 11px 14px !important;
+        box-sizing: border-box;
+        box-shadow: none !important;
+    }
+
+    .ap-mobile-account-nav li::before,
+    .ap-mobile-account-nav li a::before,
+    .ap-mobile-account-nav li a::after {
+        display: none !important;
+        content: none !important;
+    }
+
+    .ap-mobile-account-nav li.ap-mobile-account-first a {
+        border-top-left-radius: 14px;
+        border-top-right-radius: 14px;
+    }
+
+    .ap-mobile-account-nav li.ap-mobile-account-last a {
+        border-bottom-width: 1px;
+        border-bottom-left-radius: 14px;
+        border-bottom-right-radius: 14px;
+    }
+
+    .ap-mobile-account-nav li.woocommerce-MyAccount-navigation-link--wishlist::before {
+        content: "WISHLIST";
+        display: block;
+        color: #b5a9a2;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .14em;
+        margin: 18px 0 8px;
+    }
+
+    .ap-mobile-account-nav li.woocommerce-MyAccount-navigation-link--wishlist a {
+        border-width: 1px;
+        border-radius: 14px;
+    }
+
+    .ap-mobile-account-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 5px;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ap-mobile-account-icon svg {
+        width: 25px;
+        height: 25px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .ap-mobile-account-icon--sparkles {
+        background: #eaf5ff;
+        color: #5a9fce;
+    }
+
+    .ap-mobile-account-icon--bag {
+        background: #edf9ef;
+        color: #52a665;
+    }
+
+    .ap-mobile-account-icon--pin {
+        background: #f5efff;
+        color: #8d66dc;
+    }
+
+    .ap-mobile-account-icon--user {
+        background: #fff0f0;
+        color: #d96969;
+    }
+
+    .ap-mobile-account-icon--id-card {
+        background: #fff4e0;
+        color: #e09127;
+    }
+
+    .ap-mobile-account-icon--heart {
+        background: #fff0f5;
+        color: #e45f7d;
+    }
+
+    .ap-mobile-account-icon--coupon,
+    .ap-mobile-account-icon--credit {
+        background: #fff0f0;
+        color: #d96969;
+    }
+
+    .ap-mobile-account-text {
+        min-width: 0;
+        flex: 1;
+        display: grid;
+        gap: 2px;
+    }
+
+    .ap-mobile-account-text strong {
+        font-size: 14px;
+        line-height: 1.15;
+        font-weight: 700;
+        color: #030303;
+    }
+
+    .ap-mobile-account-text small {
+        font-size: 11px;
+        line-height: 1.15;
+        color: #a2938c;
+    }
+
+    .ap-mobile-account-badge {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background: #111;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 18px;
+        text-align: center;
+        box-sizing: border-box;
+    }
+
+    .ap-mobile-account-arrow {
+        color: #d1c8c0;
+        font-size: 24px;
+        line-height: 1;
+        margin-left: 2px;
+    }
+
+    .ap-mobile-account-logout {
+        margin-top: 10px !important;
+    }
+
+    .ap-mobile-account-logout a {
+        min-height: 44px;
+        justify-content: center;
+        gap: 7px;
+        border-width: 1px !important;
+        border-radius: 12px !important;
+        color: #d92923 !important;
+    }
+
+    .ap-mobile-account-logout .ap-mobile-account-icon {
+        width: 18px;
+        height: 18px;
+        background: transparent;
+        color: currentColor;
+    }
+
+    .ap-mobile-account-logout .ap-mobile-account-icon svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    .ap-mobile-account-logout .ap-mobile-account-text {
+        flex: 0 0 auto;
+    }
+
+    .ap-mobile-account-logout .ap-mobile-account-text strong {
+        color: currentColor;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .ap-mobile-account-logout .ap-mobile-account-arrow,
+    .ap-mobile-account-logout .ap-mobile-account-badge {
+        display: none;
+    }
+
+    .ap-mobile-orders-list {
+        display: grid;
+        gap: 10px;
+        padding: 0 0 24px;
+    }
+
+    .ap-mobile-order-card {
+        min-height: 89px;
+        display: flex;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 14px 13px;
+        border: 1px solid #eee8e2;
+        border-radius: 14px;
+        background: #fff;
+        color: #050505;
+        text-decoration: none !important;
+        box-sizing: border-box;
+    }
+
+    .ap-mobile-order-main,
+    .ap-mobile-order-side {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ap-mobile-order-main {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .ap-mobile-order-main strong {
+        color: #050505;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    .ap-mobile-order-main small {
+        color: #9b8d85;
+        font-size: 11px;
+        line-height: 1.3;
+        margin-top: 4px;
+    }
+
+    .ap-mobile-order-main em {
+        color: #8f827a;
+        font-size: 12px;
+        line-height: 1.2;
+        font-style: normal;
+        margin-top: auto;
+        padding-top: 15px;
+    }
+
+    .ap-mobile-order-side {
+        align-items: flex-end;
+        justify-content: space-between;
+        flex: 0 0 auto;
+        text-align: right;
+    }
+
+    .ap-mobile-order-side > strong {
+        color: #050505;
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .ap-mobile-order-status {
+        min-width: 64px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        background: #f1eef8;
+        color: #7e55d8;
+    }
+
+    .ap-mobile-order-status--processing {
+        background: #eef6fb;
+        color: #347fb6;
+    }
+
+    .ap-mobile-order-status--completed,
+    .ap-mobile-order-status--delivered {
+        background: #eef8ee;
+        color: #4f9c51;
+    }
+
+    .ap-mobile-order-status--pending,
+    .ap-mobile-order-status--pending-payment,
+    .ap-mobile-order-status--on-hold {
+        background: #fff7eb;
+        color: #c78a2a;
+    }
+
+    .ap-mobile-order-status--cancelled,
+    .ap-mobile-order-status--failed,
+    .ap-mobile-order-status--refunded {
+        background: #fff0ef;
+        color: #d95656;
+    }
+
+    .ap-mobile-detail-page {
+        display: grid;
+        gap: 24px;
+        padding: 0 0 28px;
+    }
+
+    .ap-mobile-detail-section {
+        display: grid;
+        gap: 8px;
+    }
+
+    .ap-mobile-detail-section h3 {
+        margin: 0;
+        color: #a89b93;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .14em;
+        line-height: 1.2;
+    }
+
+    .ap-mobile-track-card,
+    .ap-mobile-detail-card,
+    .ap-mobile-summary-card,
+    .ap-mobile-address-card {
+        border: 1px solid #eee8e2;
+        border-radius: 14px;
+        background: #fff;
+        box-sizing: border-box;
+    }
+
+    .ap-mobile-track-card {
+        padding: 22px 14px 15px;
+    }
+
+    .ap-mobile-track-steps {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        position: relative;
+        gap: 0;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #f0ebe6;
+    }
+
+    .ap-mobile-track-steps::before {
+        content: none;
+    }
+
+    .ap-mobile-track-step::before {
+        content: "";
+        position: absolute;
+        top: 9px;
+        left: calc(-50% + 12px);
+        right: calc(50% + 12px);
+        height: 2px;
+        background: #e6e1dd;
+        z-index: 0;
+    }
+
+    .ap-mobile-track-step:first-child::before {
+        content: none;
+    }
+
+    .ap-mobile-track-step.is-done::before {
+        background: #62a5d9;
+    }
+
+    .ap-mobile-track-step.is-cancelled.is-done::before,
+    .ap-mobile-track-step.is-refunded.is-done::before {
+        background: #d96969;
+    }
+
+    .ap-mobile-track-step {
+        min-width: 0;
+        position: relative;
+        z-index: 1;
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        text-align: center;
+    }
+
+    .ap-mobile-track-step i {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: 2px solid #e6e1dd;
+        background: #fff;
+        color: #fff;
+        font-size: 10px;
+        font-style: normal;
+        line-height: 1;
+        box-sizing: border-box;
+    }
+
+    .ap-mobile-track-step.is-done i {
+        border-color: #62a5d9;
+        background: #62a5d9;
+    }
+
+    .ap-mobile-track-step.is-current i {
+        border-color: #62a5d9;
+        /*background: #fff;*/
+        box-shadow: 0 0 0 3px rgba(98, 165, 217, .18);
+    }
+
+    .ap-mobile-track-step.is-cancelled.is-done i,
+    .ap-mobile-track-step.is-refunded.is-done i {
+        border-color: #d96969;
+        background: #d96969;
+        color: #fff;
+        font-weight: 700;
+    }
+
+    .ap-mobile-track-step.is-cancelled.is-current i,
+    .ap-mobile-track-step.is-refunded.is-current i {
+        border-color: #d96969;
+        box-shadow: 0 0 0 3px rgba(217, 105, 105, .22);
+    }
+
+    .ap-mobile-track-step.is-cancelled.is-current small,
+    .ap-mobile-track-step.is-refunded.is-current small {
+        color: #c0392b;
+    }
+
+    .ap-mobile-track-step small {
+        color: #7c8b97;
+        font-size: 10px;
+        line-height: 1.15;
+    }
+
+    .ap-mobile-track-step.is-current small {
+        color: #050505;
+        font-weight: 800;
+    }
+
+    .ap-mobile-track-note {
+        color: #66737d;
+        font-size: 12px;
+        line-height: 1.45;
+        padding-top: 13px;
+    }
+
+    .ap-mobile-track-note strong {
+        color: #050505;
+    }
+
+    .ap-mobile-detail-card {
+        overflow: hidden;
+    }
+
+    .ap-mobile-detail-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 15px;
+        border-bottom: 1px solid #f0ebe6;
+    }
+
+    .ap-mobile-detail-item:last-child {
+        border-bottom: 0;
+    }
+
+    .ap-mobile-detail-thumb {
+        width: 44px;
+        height: 44px;
+        border: 1px solid #eee8e2;
+        border-radius: 8px;
+        background: #faf8f5;
+        color: #c0b8b0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        overflow: hidden;
+    }
+
+    .ap-mobile-detail-thumb svg {
+        width: 24px;
+        height: 24px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .ap-mobile-detail-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .ap-mobile-detail-item-main {
+        min-width: 0;
+        flex: 1;
+        display: grid;
+        gap: 4px;
+    }
+
+    .ap-mobile-detail-item-main strong {
+        color: #050505;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.15;
+    }
+
+    .ap-mobile-detail-item-main small {
+        color: #9b8d85;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    .ap-mobile-detail-price {
+        color: #050505;
+        font-size: 15px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .ap-mobile-summary-card {
+        padding: 16px 15px;
+    }
+
+    .ap-mobile-summary-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: #5e5650;
+        font-size: 13px;
+        line-height: 1.35;
+        padding: 5px 0;
+    }
+
+    .ap-mobile-summary-row strong {
+        color: #5e5650;
+        font-weight: 500;
+        text-align: right;
+    }
+
+    .ap-mobile-summary-row--total {
+        margin-top: 5px;
+        padding-top: 12px;
+        border-top: 1px solid #eee8e2;
+        color: #050505;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .ap-mobile-summary-row--total strong {
+        color: #050505;
+        font-size: 17px;
+        font-weight: 800;
+    }
+
+    .ap-mobile-address-card {
+        display: grid;
+        gap: 5px;
+        padding: 15px;
+        color: #5e5650;
+        font-size: 13px;
+        line-height: 1.35;
+    }
+
+    .ap-mobile-address-card strong {
+        color: #050505;
+        font-size: 14px;
+        font-weight: 800;
+        margin-bottom: 2px;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .ap-acct-modal-body {
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .ap-account-details-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0;
+        margin: 0;
+        border: 0;
+    }
+
+    .ap-account-details-avatar-wrap {
+        position: relative;
+        flex: 0 0 auto;
+    }
+
+    .ap-account-details-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: linear-gradient(135deg, #F5A623 0%, #F7C96A 100%);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+        cursor: pointer;
+    }
+
+    .ap-account-details-camera {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        background: #fff;
+        color: #555;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+    }
+
+    .ap-account-details-camera svg {
+        width: 11px;
+        height: 11px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .ap-account-details-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .ap-account-details-id {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .ap-account-details-id strong {
+        color: #1A1A18;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .ap-account-details-id span {
+        color: #7A7A72;
+        font-size: 12px;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+
+    .ap-account-photo-btn {
+        width: max-content;
+        min-height: 28px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        border: 1px solid oklch(0.90 0.06 70);
+        border-radius: 6px;
+        background: oklch(0.97 0.04 70);
+        color: #D4891A;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1;
+        box-shadow: none;
+        cursor: pointer;
+        transition: background .15s;
+    }
+
+    .ap-account-photo-btn:hover {
+        background: oklch(0.94 0.06 70);
+    }
+
+    .ap-account-photo-btn svg {
+        width: 12px;
+        height: 12px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .ap-account-photo-btn:disabled {
+        cursor: wait;
+        opacity: .72;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details form.woocommerce-EditAccountForm,
+    #ap-acct-modal.ap-acct-modal--account-details form.edit-account {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 12px;
+        margin: 0;
+    }
+
+    #ap-acct-modal-body form.woocommerce-EditAccountForm:not(.ap-account-details-form),
+    #ap-acct-modal-body form.edit-account:not(.ap-account-details-form) {
+        visibility: hidden;
+    }
+
+    .ap-account-section-title {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: #7A7A72;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        line-height: 1.2;
+        text-transform: uppercase;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details fieldset {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 12px;
+        margin: 8px 0 0;
+        padding: 20px 0 0;
+        border: 0;
+        border-top: 1px solid #E2E2DC;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details legend {
+        grid-column: 1 / -1;
+        display: block;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        color: #7A7A72;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .form-row {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        float: none;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .form-row-first {
+        grid-column: 1 / 2;
+        width: 100%;
+        margin: 0;
+        float: none;
+        clear: none;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .form-row-last {
+        grid-column: 2 / 3;
+        width: 100%;
+        margin: 0;
+        float: none;
+        clear: none;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details fieldset .form-row,
+    #ap-acct-modal.ap-acct-modal--account-details fieldset .form-row-first,
+    #ap-acct-modal.ap-acct-modal--account-details fieldset .form-row-last {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .wpua-edit-container,
+    #ap-acct-modal.ap-acct-modal--account-details #wp-user-avatar,
+    #ap-acct-modal.ap-acct-modal--account-details .simple-local-avatar-photo,
+    #ap-acct-modal.ap-acct-modal--account-details #simple-local-avatar-block,
+    #ap-acct-modal.ap-acct-modal--account-details .woocommerce-account-avatar,
+    #ap-acct-modal.ap-acct-modal--account-details .user-profile-picture,
+    #ap-acct-modal.ap-acct-modal--account-details form .form-row:has(input[type="file"]),
+    #ap-acct-modal.ap-acct-modal--account-details form > p:has(input[type="file"]),
+    #ap-acct-modal.ap-acct-modal--account-details form fieldset:has(input[type="file"]):not(:has(input[type="password"])) {
+        display: none !important;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .form-row-wide {
+        grid-column: 1 / -1;
+        clear: none;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details label {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        margin: 0;
+        color: #000;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details .required {
+        color: #F5A623;
+        font-size: 12px;
+        text-decoration: none;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details input.input-text,
+    #ap-acct-modal.ap-acct-modal--account-details input[type="text"],
+    #ap-acct-modal.ap-acct-modal--account-details input[type="email"],
+    #ap-acct-modal.ap-acct-modal--account-details input[type="password"] {
+        width: 100%;
+        height: 42px;
+        border: 1.5px solid #E2E2DC;
+        border-radius: 8px;
+        background: #FAFAF8;
+        color: #1A1A18;
+        padding: 0 12px;
+        font-size: 14px;
+        box-shadow: none;
+        box-sizing: border-box;
+        outline: none;
+        transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details input.input-text:focus,
+    #ap-acct-modal.ap-acct-modal--account-details input[type="text"]:focus,
+    #ap-acct-modal.ap-acct-modal--account-details input[type="email"]:focus,
+    #ap-acct-modal.ap-acct-modal--account-details input[type="password"]:focus {
+        border-color: #F5A623;
+        background: #fff;
+        box-shadow: 0 0 0 3px oklch(0.95 0.08 70 / 0.5);
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details input::placeholder {
+        color: #C0C0B8;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details input[type="password"],
+    #ap-acct-modal.ap-acct-modal--account-details .ap-account-pass-wrap input[type="text"] {
+        padding-right: 42px;
+    }
+
+    .ap-account-pass-wrap {
+        position: relative;
+        display: block;
+        width: 100%;
+    }
+
+    .ap-account-pass-toggle {
+        position: absolute;
+        top: 50%;
+        right: 12px;
+        width: 24px;
+        height: 24px;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #7A7A72;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        box-shadow: none;
+        cursor: pointer;
+        transition: color .15s;
+    }
+
+    .ap-account-pass-toggle:hover {
+        color: #1A1A18;
+    }
+
+    .ap-account-pass-toggle svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details em {
+        display: block;
+        margin-top: 3px;
+        color: #7A7A72;
+        font-size: 12px;
+        font-style: normal;
+        line-height: 1.4;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details p:last-child {
+        grid-column: 1 / -1;
+        display: flex;
+        /*align-items: center;*/
+        justify-content: space-between;
+        gap: 12px;
+        margin: 8px 0 0;
+        padding: 0;
+    }
+
+    .ap-account-details-cancel {
+        min-width: 0;
+        height: auto;
+        border: 0;
+        background: transparent;
+        color: #7A7A72;
+        padding: 0;
+        font-size: 13px;
+        font-weight: 400;
+        box-shadow: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: color .15s;
+    }
+
+    .ap-account-details-cancel:hover {
+        color: #1A1A18;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details button.button,
+    #ap-acct-modal.ap-acct-modal--account-details .woocommerce-Button {
+        min-width: 0;
+        height: 44px;
+        border: 0;
+        border-radius: 8px;
+        background: #F5A623 !important;
+        color: #fff !important;
+        padding: 0 28px;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        box-shadow: none;
+        cursor: pointer;
+        transition: background .15s, transform .1s;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details button.button:hover,
+    #ap-acct-modal.ap-acct-modal--account-details .woocommerce-Button:hover {
+        background: #D4891A !important;
+    }
+
+    #ap-acct-modal.ap-acct-modal--account-details button.button:active,
+    #ap-acct-modal.ap-acct-modal--account-details .woocommerce-Button:active {
+        transform: scale(0.98);
     }
 }
 
@@ -1069,7 +2470,7 @@ body.woocommerce-account .entry-title {
     width: 12px;
     height: 12px;
     border: 2px solid var(--ap-border);
-    border-top-color: var(--herlan-primary-color, #eb161e);
+    border-top-color: var(--ap-text, #eb161e);
     border-radius: 50%;
     animation: ap-spin .7s linear infinite;
     vertical-align: middle;
@@ -1087,9 +2488,9 @@ body.woocommerce-account .entry-title {
     gap: 4px;
     font-size: .78rem;
     font-weight: 600;
-    color: var(--herlan-primary-color, #eb161e);
+    color: var(--ap-text, #eb161e);
     background: none;
-    border: 1px solid var(--herlan-primary-color, #eb161e);
+    border: 1px solid var(--ap-text, #eb161e);
     border-radius: 20px;
     padding: 5px 16px;
     cursor: pointer;
@@ -1097,7 +2498,7 @@ body.woocommerce-account .entry-title {
     transition: background var(--ap-transition), color var(--ap-transition);
 }
 #ap-loyalty-view-more:hover {
-    background: var(--herlan-primary-color, #eb161e);
+    background: var(--ap-text, #eb161e);
     color: #fff;
 }
 

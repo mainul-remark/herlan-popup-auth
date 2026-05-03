@@ -8,6 +8,9 @@ class Auth_Popup_Admin_Settings {
         add_action( 'admin_init',             [ __CLASS__, 'register_settings'  ] );
         add_action( 'admin_enqueue_scripts',  [ __CLASS__, 'enqueue_assets'     ] );
         add_filter( 'plugin_action_links_' . AUTH_POPUP_BASENAME, [ __CLASS__, 'plugin_action_links' ] );
+        add_filter( 'manage_users_columns', [ __CLASS__, 'add_users_phone_column' ] );
+        add_filter( 'manage_users_custom_column', [ __CLASS__, 'render_users_phone_column' ], 10, 3 );
+        add_action( 'pre_user_query', [ __CLASS__, 'include_phone_in_users_search' ] );
 
         // Combined mobile + email migration AJAX
         add_action( 'wp_ajax_auth_popup_user_data_mig_status', [ __CLASS__, 'ajax_user_data_migration_status' ] );
@@ -16,6 +19,90 @@ class Auth_Popup_Admin_Settings {
         // WC address import AJAX
         add_action( 'wp_ajax_auth_popup_wc_import_status', [ __CLASS__, 'ajax_wc_import_status' ] );
         add_action( 'wp_ajax_auth_popup_run_wc_import',    [ __CLASS__, 'ajax_run_wc_import'    ] );
+    }
+
+    public static function add_users_phone_column( array $columns ): array {
+        $new_columns = [];
+
+        foreach ( $columns as $key => $label ) {
+            $new_columns[ $key ] = $label;
+
+            if ( 'email' === $key ) {
+                $new_columns['auth_popup_phone'] = __( 'Phone', 'auth-popup' );
+            }
+        }
+
+        if ( ! isset( $new_columns['auth_popup_phone'] ) ) {
+            $new_columns['auth_popup_phone'] = __( 'Phone', 'auth-popup' );
+        }
+
+        return $new_columns;
+    }
+
+    public static function render_users_phone_column( string $output, string $column_name, int $user_id ): string {
+        if ( 'auth_popup_phone' !== $column_name ) {
+            return $output;
+        }
+
+        $phone = Auth_Popup_User_Auth::get_user_phone( $user_id );
+
+        return $phone ? esc_html( $phone ) : '&mdash;';
+    }
+
+    public static function include_phone_in_users_search( WP_User_Query $query ): void {
+        global $wpdb, $pagenow;
+
+        if ( ! is_admin() || 'users.php' !== $pagenow ) {
+            return;
+        }
+
+        $search = trim( (string) $query->get( 'search' ) );
+        if ( '' === $search ) {
+            return;
+        }
+
+        $term = trim( $search, '*' );
+        if ( '' === $term ) {
+            return;
+        }
+
+        $like         = '%' . $wpdb->esc_like( $term ) . '%';
+        $digits       = preg_replace( '/\D+/', '', $term );
+        $profile_join = " LEFT JOIN {$wpdb->prefix}auth_popup_user_profiles ap_phone_profile ON ap_phone_profile.user_id = {$wpdb->users}.ID";
+        $meta_join    = " LEFT JOIN {$wpdb->usermeta} ap_billing_phone ON ap_billing_phone.user_id = {$wpdb->users}.ID AND ap_billing_phone.meta_key = 'billing_phone'";
+
+        if ( false === strpos( $query->query_from, 'ap_phone_profile' ) ) {
+            $query->query_from .= $profile_join;
+        }
+
+        if ( false === strpos( $query->query_from, 'ap_billing_phone' ) ) {
+            $query->query_from .= $meta_join;
+        }
+
+        $phone_where = $wpdb->prepare(
+            ' OR ap_phone_profile.phone LIKE %s OR ap_billing_phone.meta_value LIKE %s',
+            $like,
+            $like
+        );
+
+        if ( '' !== $digits && $digits !== $term ) {
+            $digit_like  = '%' . $wpdb->esc_like( $digits ) . '%';
+            $phone_where .= $wpdb->prepare(
+                ' OR REPLACE(REPLACE(REPLACE(REPLACE(ap_phone_profile.phone, "+", ""), " ", ""), "-", ""), ".", "") LIKE %s
+                  OR REPLACE(REPLACE(REPLACE(REPLACE(ap_billing_phone.meta_value, "+", ""), " ", ""), "-", ""), ".", "") LIKE %s',
+                $digit_like,
+                $digit_like
+            );
+        }
+
+        $query->query_where = preg_replace(
+            '/\)\s*$/',
+            $phone_where . ' )',
+            $query->query_where,
+            1
+        );
+
+        $query->query_fields = 'DISTINCT ' . preg_replace( '/^DISTINCT\s+/i', '', $query->query_fields );
     }
 
     public static function add_menu(): void {

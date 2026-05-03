@@ -60,7 +60,7 @@ class Auth_Popup_Address_Manager {
      * @param int   $address_id  0 = insert, >0 = update existing row.
      * @return int|\WP_Error     Row ID on success.
      */
-    public static function save( int $user_id, array $data, int $address_id = 0 ): int|\WP_Error {
+    public static function save( int $user_id, array $data, int $address_id = 0 ) {
         global $wpdb;
 
         $fields = self::sanitize_fields( $data );

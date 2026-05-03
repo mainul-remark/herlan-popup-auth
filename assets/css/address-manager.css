@@ -187,6 +187,125 @@
     background: #fafafa;
 }
 
+.aab-skel {
+    --aab-skel-base: #f3f0ec;
+    --aab-skel-shine: #fbfaf8;
+    display: grid;
+    gap: 12px;
+}
+
+.aab-skel-line,
+.aab-skel-icon,
+.aab-skel-btn,
+.aab-skel-dot {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    background: var(--aab-skel-base);
+}
+
+.aab-skel-line::after,
+.aab-skel-icon::after,
+.aab-skel-btn::after,
+.aab-skel-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--aab-skel-shine), transparent);
+    animation: aab-skeleton-shimmer 1.15s infinite;
+}
+
+.aab-skel-line {
+    width: 60%;
+    height: 12px;
+    border-radius: 999px;
+    margin: 0 0 8px;
+}
+
+.aab-skel-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    flex: 0 0 auto;
+}
+
+.aab-skel-btn {
+    width: 118px;
+    height: 36px;
+    border-radius: 999px;
+}
+
+.aab-skel-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+
+.aab-skel-w-34 { width: 34%; }
+.aab-skel-w-36 { width: 36%; }
+.aab-skel-w-40 { width: 40%; }
+.aab-skel-w-42 { width: 42%; }
+.aab-skel-w-48 { width: 48%; }
+.aab-skel-w-64 { width: 64%; }
+.aab-skel-w-70 { width: 70%; }
+.aab-skel-w-76 { width: 76%; }
+.aab-skel-w-78 { width: 78%; }
+.aab-skel-w-82 { width: 82%; }
+
+.aab-skel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.aab-skel-card {
+    padding: 15px;
+    border: 1px solid #eee8e2;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.aab-skel-card-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.aab-skel-inline {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    gap: 0;
+    background: #fff;
+    margin-bottom: 10px;
+}
+
+.aab-skel-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.aab-skel-inline-row:last-child {
+    border-bottom: 0;
+}
+
+.aab-skel-inline-row > div {
+    flex: 1;
+}
+
+@keyframes aab-skeleton-shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
+
 /* Add New Address button */
 .aab-add-new-inline {
     display: block;

@@ -9,6 +9,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function init(): void {
         $actions = [
+            'auth_popup_refresh_nonce',
             'auth_popup_send_otp',
             'auth_popup_login_password',
             'auth_popup_login_otp',
@@ -41,6 +42,12 @@ class Auth_Popup_Ajax_Handler {
         foreach ( $address_actions as $action ) {
             add_action( 'wp_ajax_' . $action, [ __CLASS__, $action ] );
         }
+    }
+
+    public static function auth_popup_refresh_nonce(): void {
+        wp_send_json_success( [
+            'nonce' => wp_create_nonce( 'auth_popup_nonce' ),
+        ] );
     }
 
     /* ── Send OTP ───────────────────────────────────────────────────── */
@@ -299,7 +306,11 @@ class Auth_Popup_Ajax_Handler {
     /* ── Google Auth ────────────────────────────────────────────────── */
 
     public static function auth_popup_google_auth(): void {
-        self::verify_nonce();
+        // Google sign-in already requires a fresh Google access token that is
+        // verified server-side below. Do not hard-fail on the WP page nonce
+        // here because cached guest pages can intermittently serve an expired
+        // nonce and block otherwise valid Google logins.
+        check_ajax_referer( 'auth_popup_nonce', 'nonce', false );
 
         $access_token = sanitize_text_field( $_POST['access_token'] ?? '' );
 
@@ -585,7 +596,7 @@ class Auth_Popup_Ajax_Handler {
                 return $from; // already valid — don't touch it
             }
             $host = (string) wp_parse_url( get_site_url(), PHP_URL_HOST );
-            if ( str_starts_with( $host, 'www.' ) ) {
+            if ( strpos( $host, 'www.' ) === 0 ) {
                 $host = substr( $host, 4 );
             }
             // Domains without a dot (e.g. "localhost") are invalid in email addresses

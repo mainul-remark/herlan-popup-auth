@@ -86,12 +86,12 @@ class Auth_Popup_SMS_Service {
         $phone = ltrim( $phone, '0' );
 
         // If starts with 880, it's already correct
-        if ( str_starts_with( $phone, '880' ) ) {
+        if ( strpos( $phone, '880' ) === 0 ) {
             return $phone;
         }
 
         // If 10-digit BD number (1XXXXXXXXX), prepend 880
-        if ( strlen( $phone ) === 10 && str_starts_with( $phone, '1' ) ) {
+        if ( strlen( $phone ) === 10 && strpos( $phone, '1' ) === 0 ) {
             return '880' . $phone;
         }
 
