@@ -193,6 +193,19 @@
                             <p class="description"><?php esc_html_e( 'Comma-separated CSS selectors that open the popup on click. Also use shortcode [auth_popup_button].', 'auth-popup' ); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'REST API Key', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="text" readonly id="ap-rest-api-key" value="<?php echo esc_attr( $s['rest_api_key'] ?? '' ); ?>" class="large-text" style="font-family:monospace;">
+                            <input type="hidden" name="auth_popup_settings[rest_api_key]" value="<?php echo esc_attr( $s['rest_api_key'] ?? '' ); ?>">
+                            <button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('ap-rest-api-key').value)"><?php esc_html_e( 'Copy', 'auth-popup' ); ?></button>
+                            <p class="description">
+                                <?php esc_html_e( 'Send this key in every REST API request header:', 'auth-popup' ); ?>
+                                <code>X-API-Key: &lt;key&gt;</code><br>
+                                <?php esc_html_e( 'Generated automatically. Keep it secret — it controls access to all REST endpoints.', 'auth-popup' ); ?>
+                            </p>
+                        </td>
+                    </tr>
                 </table>
 
                 <div class="auth-popup-shortcode-info">

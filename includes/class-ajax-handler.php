@@ -888,7 +888,7 @@ class Auth_Popup_Ajax_Handler {
 
     /* ── Forgot-password email builder ──────────────────────────────── */
 
-    private static function build_forgot_otp_email( string $name, string $otp, string $site_name ): string {
+    public static function build_forgot_otp_email( string $name, string $otp, string $site_name ): string {
         $digits = '';
         foreach ( str_split( $otp ) as $d ) {
             $digits .= '<span style="display:inline-block;width:40px;height:48px;line-height:48px;text-align:center;font-size:28px;font-weight:700;border:2px solid #e5e7eb;border-radius:8px;margin:0 4px;color:#111827;">' . esc_html( $d ) . '</span>';

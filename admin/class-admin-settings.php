@@ -168,6 +168,13 @@ class Auth_Popup_Admin_Settings {
                 case 'loyalty_api_url':
                     $clean[ $key ] = esc_url_raw( $value );
                     break;
+                case 'rest_api_key':
+                    // Preserve existing key if the submitted value is empty (read-only field)
+                    $existing      = Auth_Popup_Core::get_setting( 'rest_api_key', '' );
+                    $clean[ $key ] = ! empty( $raw[ $key ] )
+                        ? sanitize_text_field( $raw[ $key ] )
+                        : $existing;
+                    break;
                 default:
                     $clean[ $key ] = sanitize_text_field( $value );
             }

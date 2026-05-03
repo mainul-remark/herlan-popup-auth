@@ -5,7 +5,7 @@
  * Description: SAAS-ready WordPress popup authentication — OTP via SSLCommerce iSMS Plus, Google OAuth, Facebook OAuth. All AJAX-driven.
  * Version:     1.0.14
  * Requires at least: 5.8
- * Requires PHP: 7.4
+ * Requires PHP: 8.2
  * Author:      Muhammad Ali
  * Author URI:  https://herlan.com
  * License:     GPL v2 or later
@@ -29,6 +29,7 @@ require_once AUTH_POPUP_PATH . 'includes/class-user-auth.php';
 require_once AUTH_POPUP_PATH . 'includes/class-oauth-handler.php';
 require_once AUTH_POPUP_PATH . 'includes/class-address-manager.php';
 require_once AUTH_POPUP_PATH . 'includes/class-ajax-handler.php';
+require_once AUTH_POPUP_PATH . 'includes/class-rest-api.php';
 require_once AUTH_POPUP_PATH . 'admin/class-admin-settings.php';
 require_once AUTH_POPUP_PATH . 'public/class-public-frontend.php';
 

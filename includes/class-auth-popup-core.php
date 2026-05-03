@@ -51,8 +51,16 @@ class Auth_Popup_Core {
             wp_schedule_event( time(), 'daily', 'auth_popup_cleanup_otp_logs' );
         }
 
+        // Ensure every active install has a REST API key
+        $settings = get_option( 'auth_popup_settings', [] );
+        if ( empty( $settings['rest_api_key'] ) ) {
+            $settings['rest_api_key'] = bin2hex( random_bytes( 16 ) );
+            update_option( 'auth_popup_settings', $settings );
+        }
+
         // Boot modules
         Auth_Popup_Ajax_Handler::init();
+        Auth_Popup_REST_API::init();
         Auth_Popup_Admin_Settings::init();
         Auth_Popup_Public_Frontend::init();
     }
@@ -78,6 +86,13 @@ class Auth_Popup_Core {
         // Set default options if not present
         if ( ! get_option( 'auth_popup_settings' ) ) {
             update_option( 'auth_popup_settings', self::default_settings() );
+        }
+
+        // Ensure every install has a REST API key
+        $settings = get_option( 'auth_popup_settings', [] );
+        if ( empty( $settings['rest_api_key'] ) ) {
+            $settings['rest_api_key'] = bin2hex( random_bytes( 16 ) );
+            update_option( 'auth_popup_settings', $settings );
         }
 
         // Schedule combined mobile + email migration
@@ -616,6 +631,8 @@ class Auth_Popup_Core {
             'checkout_disable_ship_to_different'=> '1',
             // My Account inline form
             'myaccount_inline_form'             => '1',
+            // REST API
+            'rest_api_key'                      => '',
         ];
     }
 
