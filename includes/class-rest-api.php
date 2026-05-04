@@ -913,6 +913,11 @@ class Auth_Popup_REST_API {
             return $result;
         }
 
+        // Only protect auth-popup routes, not core WP or other plugin routes
+        if ( strpos( $request->get_route(), '/' . self::NAMESPACE . '/' ) !== 0 ) {
+            return $result;
+        }
+
         $configured_key = (string) Auth_Popup_Core::get_setting( 'rest_api_key', '' );
         if ( empty( $configured_key ) ) {
             return $result;
