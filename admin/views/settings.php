@@ -206,6 +206,20 @@
                             </p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Access Token Lifetime (hours)', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[token_lifetime_hours]" value="<?php echo absint( $s['token_lifetime_hours'] ?? 12 ); ?>" min="1" max="168" class="small-text">
+                            <p class="description"><?php esc_html_e( 'How long a login token stays valid before the app must refresh it. Default: 12 hours. Max: 168 (7 days).', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Refresh Token Lifetime (days)', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[refresh_token_lifetime_days]" value="<?php echo absint( $s['refresh_token_lifetime_days'] ?? 7 ); ?>" min="1" max="365" class="small-text">
+                            <p class="description"><?php esc_html_e( 'How long a refresh token stays valid. When it expires the user must log in again. Default: 7 days.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
                 </table>
 
                 <div class="auth-popup-shortcode-info">

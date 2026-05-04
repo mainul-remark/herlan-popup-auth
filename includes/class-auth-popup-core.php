@@ -633,6 +633,8 @@ class Auth_Popup_Core {
             'myaccount_inline_form'             => '1',
             // REST API
             'rest_api_key'                      => '',
+            'token_lifetime_hours'              => 12,
+            'refresh_token_lifetime_days'       => 7,
         ];
     }
 

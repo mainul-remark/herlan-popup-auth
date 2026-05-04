@@ -169,6 +169,18 @@ class Auth_Popup_REST_API {
             'methods'             => WP_REST_Server::CREATABLE,
             'callback'            => [ __CLASS__, 'logout' ],
             'permission_callback' => '__return_true',
+            'args'                => [
+                'refresh_token' => [ 'required' => false, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+            ],
+        ] );
+
+        register_rest_route( $ns, '/auth/refresh', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [ __CLASS__, 'refresh_token' ],
+            'permission_callback' => '__return_true',
+            'args'                => [
+                'refresh_token' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+            ],
         ] );
 
         register_rest_route( $ns, '/auth/check-phone', [
@@ -318,11 +330,11 @@ class Auth_Popup_REST_API {
         }
 
         self::clear_password_failures( $credential );
-        $token = self::generate_token( $user->ID );
+        $tokens = self::generate_token( $user->ID );
 
         return self::success(
             __( 'Login successful!', 'auth-popup' ),
-            [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ]
+            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
         );
     }
 
@@ -353,11 +365,11 @@ class Auth_Popup_REST_API {
             return self::error( $user->get_error_message(), 500 );
         }
 
-        $token = self::generate_token( $user->ID );
+        $tokens = self::generate_token( $user->ID );
 
         return self::success(
             __( 'Login successful!', 'auth-popup' ),
-            [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ]
+            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
         );
     }
 
@@ -402,13 +414,13 @@ class Auth_Popup_REST_API {
             $loyalty_note = self::register_loyalty( $user, $name, $email, $norm, $request );
         }
 
-        $token   = self::generate_token( $user->ID );
+        $tokens  = self::generate_token( $user->ID );
         $message = __( 'Account created! Welcome aboard.', 'auth-popup' );
         if ( $loyalty_note ) {
             $message .= ' ' . $loyalty_note;
         }
 
-        return self::success( $message, [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ], 201 );
+        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] ), 201 );
     }
 
     public static function google_auth( WP_REST_Request $request ): WP_REST_Response {
@@ -429,10 +441,10 @@ class Auth_Popup_REST_API {
                     if ( is_wp_error( $user ) ) {
                         return self::error( $user->get_error_message(), 500 );
                     }
-                    $token = self::generate_token( $user->ID );
+                    $tokens = self::generate_token( $user->ID );
                     return self::success(
                         __( 'Logged in with Google!', 'auth-popup' ),
-                        [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ]
+                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
                     );
                 }
             }
@@ -474,10 +486,10 @@ class Auth_Popup_REST_API {
                     if ( is_wp_error( $user ) ) {
                         return self::error( $user->get_error_message(), 500 );
                     }
-                    $token = self::generate_token( $user->ID );
+                    $tokens = self::generate_token( $user->ID );
                     return self::success(
                         __( 'Logged in with Facebook!', 'auth-popup' ),
-                        [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ]
+                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
                     );
                 }
             }
@@ -567,13 +579,13 @@ class Auth_Popup_REST_API {
             $loyalty_note = self::register_loyalty( $user, $name, $email, $norm, $request );
         }
 
-        $token   = self::generate_token( $user->ID );
+        $tokens  = self::generate_token( $user->ID );
         $message = __( 'Signed in successfully!', 'auth-popup' );
         if ( $loyalty_note ) {
             $message .= ' ' . $loyalty_note;
         }
 
-        return self::success( $message, [ 'token' => $token, 'redirect' => self::redirect_url( $request ) ] );
+        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] ) );
     }
 
     public static function logout( WP_REST_Request $request ): WP_REST_Response {
@@ -581,8 +593,28 @@ class Auth_Popup_REST_API {
         if ( $token ) {
             self::revoke_token( $token );
         }
+        $refresh = $request->get_param( 'refresh_token' );
+        if ( $refresh ) {
+            self::revoke_refresh_token( $refresh );
+        }
         wp_logout();
         return self::success( __( 'Logged out successfully.', 'auth-popup' ), [ 'redirect' => home_url() ] );
+    }
+
+    public static function refresh_token( WP_REST_Request $request ): WP_REST_Response {
+        $refresh_token = $request->get_param( 'refresh_token' );
+
+        $user_id = self::validate_refresh_token( $refresh_token );
+        if ( ! $user_id ) {
+            return self::error( __( 'Invalid or expired refresh token. Please log in again.', 'auth-popup' ), 401 );
+        }
+
+        // Rotate: revoke old refresh token before issuing new pair
+        self::revoke_refresh_token( $refresh_token );
+
+        $tokens = self::generate_token( $user_id );
+
+        return self::success( __( 'Token refreshed.', 'auth-popup' ), $tokens );
     }
 
     public static function check_phone( WP_REST_Request $request ): WP_REST_Response {
@@ -1064,16 +1096,32 @@ class Auth_Popup_REST_API {
     }
 
     /**
-     * Generate a new 24-hour API token for a user and persist it.
+     * Generate a new access + refresh token pair for a user.
+     * Lifetimes are read from plugin settings (defaults: 12 h / 7 days).
+     *
+     * @return array{ token: string, refresh_token: string, expires_in: int }
      */
-    public static function generate_token( int $user_id ): string {
-        $token = bin2hex( random_bytes( 32 ) ); // 64-char hex
-        set_transient( 'ap_api_' . hash( 'sha256', $token ), $user_id, DAY_IN_SECONDS );
-        return $token;
+    public static function generate_token( int $user_id ): array {
+        $access_hours   = max( 1, (int) Auth_Popup_Core::get_setting( 'token_lifetime_hours', 12 ) );
+        $refresh_days   = max( 1, (int) Auth_Popup_Core::get_setting( 'refresh_token_lifetime_days', 7 ) );
+        $access_expiry  = $access_hours * HOUR_IN_SECONDS;
+        $refresh_expiry = $refresh_days * DAY_IN_SECONDS;
+
+        $access_token  = bin2hex( random_bytes( 32 ) );
+        $refresh_token = bin2hex( random_bytes( 32 ) );
+
+        set_transient( 'ap_api_' . hash( 'sha256', $access_token ),  $user_id, $access_expiry );
+        set_transient( 'ap_rt_'  . hash( 'sha256', $refresh_token ), $user_id, $refresh_expiry );
+
+        return [
+            'token'         => $access_token,
+            'refresh_token' => $refresh_token,
+            'expires_in'    => $access_expiry,
+        ];
     }
 
     /**
-     * Return the user ID for a valid token, or 0 if invalid/expired.
+     * Return the user ID for a valid access token, or 0 if invalid/expired.
      */
     private static function validate_token( string $token ): int {
         $user_id = (int) get_transient( 'ap_api_' . hash( 'sha256', $token ) );
@@ -1081,10 +1129,25 @@ class Auth_Popup_REST_API {
     }
 
     /**
-     * Permanently invalidate a token (used on logout).
+     * Return the user ID for a valid refresh token, or 0 if invalid/expired.
+     */
+    private static function validate_refresh_token( string $token ): int {
+        $user_id = (int) get_transient( 'ap_rt_' . hash( 'sha256', $token ) );
+        return $user_id > 0 ? $user_id : 0;
+    }
+
+    /**
+     * Permanently invalidate an access token (used on logout).
      */
     private static function revoke_token( string $token ): void {
         delete_transient( 'ap_api_' . hash( 'sha256', $token ) );
+    }
+
+    /**
+     * Permanently invalidate a refresh token (used on logout and token rotation).
+     */
+    private static function revoke_refresh_token( string $token ): void {
+        delete_transient( 'ap_rt_' . hash( 'sha256', $token ) );
     }
 
     /* ── Password Rate Limiting ──────────────────────────────────────── */

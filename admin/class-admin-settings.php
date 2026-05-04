@@ -154,6 +154,8 @@ class Auth_Popup_Admin_Settings {
                 case 'otp_max_per_hour':
                 case 'otp_max_per_hour_ip':
                 case 'otp_max_verify_attempts':
+                case 'token_lifetime_hours':
+                case 'refresh_token_lifetime_days':
                     $clean[ $key ] = absint( $value );
                     break;
                 case 'enable_password_login':

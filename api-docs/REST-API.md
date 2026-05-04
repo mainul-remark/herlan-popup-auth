@@ -13,23 +13,25 @@
 2. [Authentication](#2-authentication)
    - [API Key](#21-api-key-required-on-every-request)
    - [Bearer Token](#22-bearer-token-authenticated-endpoints)
+   - [Refresh Token](#23-refresh-token)
 3. [Standard Response Envelope](#3-standard-response-envelope)
 4. [HTTP Status Codes](#4-http-status-codes)
 5. [Auth Endpoints](#5-auth-endpoints)
    - [Send OTP](#51-send-otp)
-   - [Login with Password](#52-login-with-password)
-   - [Login with OTP](#53-login-with-otp)
-   - [Register](#54-register)
-   - [Google OAuth](#55-google-oauth)
-   - [Facebook OAuth](#56-facebook-oauth)
-   - [Verify OTP (Peek)](#57-verify-otp-peek)
-   - [Social Complete](#58-social-complete)
-   - [Logout](#59-logout)
-   - [Check Phone](#510-check-phone)
-   - [Loyalty Rules](#511-loyalty-rules)
-   - [Forgot Password](#512-forgot-password)
-   - [Verify Reset OTP](#513-verify-reset-otp)
-   - [Reset Password](#514-reset-password)
+   - [Refresh Token](#52-refresh-token)
+   - [Login with Password](#53-login-with-password)
+   - [Login with OTP](#54-login-with-otp)
+   - [Register](#55-register)
+   - [Google OAuth](#56-google-oauth)
+   - [Facebook OAuth](#57-facebook-oauth)
+   - [Verify OTP (Peek)](#58-verify-otp-peek)
+   - [Social Complete](#59-social-complete)
+   - [Logout](#510-logout)
+   - [Check Phone](#511-check-phone)
+   - [Loyalty Rules](#512-loyalty-rules)
+   - [Forgot Password](#513-forgot-password)
+   - [Verify Reset OTP](#514-verify-reset-otp)
+   - [Reset Password](#515-reset-password)
 6. [Address Endpoints](#6-address-endpoints)
    - [List Addresses](#61-list-addresses)
    - [Create Address](#62-create-address)
@@ -74,6 +76,8 @@ X-API-Key: <api-key>
 
 > **Keep the API key secret.** Treat it like a password — do not expose it in client-side code, logs, or public repositories.
 
+> **Per-environment keys:** Each WordPress installation generates its own API key on activation. The key on `demo.herlan.shop` will differ from the key on `herlan.com`. Always read the key from **WP Admin → Settings → Auth Popup** on the target server.
+
 ---
 
 ### 2.2 Bearer Token (authenticated endpoints)
@@ -90,9 +94,10 @@ Authorization: Bearer <token>
 
 ### Token lifetime
 
-- Tokens are valid for **24 hours** from the moment of login.
-- Calling `/auth/logout` with the token immediately invalidates it.
-- If a request returns `401` with `"rest_invalid_token"`, the token has expired — redirect the user to the login screen.
+- Access tokens are valid for **12 hours** by default (configurable in WP Admin → Settings → Auth Popup → General → Access Token Lifetime).
+- When an access token expires, use the **refresh token** to get a new pair — see [§2.3](#23-refresh-token).
+- Calling `/auth/logout` immediately invalidates both tokens.
+- If a request returns `401` with `"rest_invalid_token"`, the access token has expired — call `/auth/refresh` first.
 
 ### Example (authenticated request)
 
@@ -115,6 +120,33 @@ Content-Type: application/json
 
 ---
 
+### 2.3 Refresh Token
+
+Every login response includes a `refresh_token` alongside the short-lived `token`. When the access token expires, exchange the refresh token for a new pair without asking the user to log in again.
+
+**Refresh token lifetime:** 7 days by default (configurable in WP Admin → Settings → Auth Popup → General → Refresh Token Lifetime).
+
+**Token rotation:** each call to `/auth/refresh` **invalidates the old refresh token** and issues a new one. Store the latest `refresh_token` from every refresh response.
+
+#### Flow
+
+```
+1. Login  → store token + refresh_token
+2. token expires (401 rest_invalid_token on any request)
+3. POST /auth/refresh { refresh_token } → new token + new refresh_token
+4. Retry original request with new token
+5. refresh_token expires (401) → send user to login screen
+```
+
+#### Storage recommendations
+
+| Token | Where to store |
+|-------|---------------|
+| `token` | Memory / secure session (short-lived, replaced often) |
+| `refresh_token` | iOS Keychain / Android Keystore / secure storage |
+
+---
+
 ## 3. Standard Response Envelope
 
 Every response — success or error — uses this JSON structure:
@@ -122,6 +154,7 @@ Every response — success or error — uses this JSON structure:
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Human-readable message.",
   "data": {}
 }
@@ -130,8 +163,11 @@ Every response — success or error — uses this JSON structure:
 | Field | Type | Description |
 |-------|------|-------------|
 | `success` | `boolean` | `true` on success, `false` on error |
+| `response_code` | `integer` | HTTP status code mirrored in the response body (e.g. `200`, `201`, `401`, `422`) |
 | `message` | `string` | Human-readable status message. Display this to the user when relevant. |
-| `data` | `object` or `array` | Payload — shape varies per endpoint (documented below) |
+| `data` | `object` or `array` | Payload — shape varies per endpoint (documented below). Empty object `{}` on errors. |
+
+> `response_code` always matches the HTTP status code of the response. It is included in the body for clients that cannot easily read HTTP status codes (e.g. some mobile frameworks).
 
 ---
 
@@ -144,13 +180,23 @@ Every response — success or error — uses this JSON structure:
 | `400` | Bad request |
 | `401` | Unauthenticated / wrong credentials / expired token |
 | `403` | Forbidden — invalid or missing API key |
-| `404` | Resource not found |
+| `404` | Endpoint not found — check the URL |
+| `405` | Method Not Allowed — endpoint requires a different HTTP method (almost always POST) |
 | `409` | Conflict (e.g. phone already registered) |
 | `410` | Gone — session or token expired |
 | `422` | Validation error (missing or invalid field) |
 | `429` | Rate limited — slow down requests |
 | `500` | Internal server error |
 | `502` | Upstream error (SMS gateway or loyalty API unreachable) |
+
+### Common mistakes
+
+| Mistake | Result |
+|---------|--------|
+| Calling a POST endpoint with GET | `405 Method Not Allowed` |
+| Wrong URL / typo in path | `404 Endpoint not found` |
+| Missing `X-API-Key` header | `403 Forbidden` |
+| Wrong `X-API-Key` value | `403 Forbidden` |
 
 ---
 
@@ -159,6 +205,7 @@ Every response — success or error — uses this JSON structure:
 ---
 
 ### 5.1 Send OTP
+
 
 Send a 6-digit OTP via SMS to a phone number.
 
@@ -184,6 +231,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "OTP sent to 8801712345678",
   "data": {
     "expiry_seconds": 300
@@ -197,6 +245,7 @@ Content-Type: application/json
 // 422 — invalid phone format
 {
   "success": false,
+  "response_code": 422,
   "message": "Please enter a valid mobile number.",
   "data": {}
 }
@@ -206,6 +255,7 @@ Content-Type: application/json
 // 404 — phone not registered (login context)
 {
   "success": false,
+  "response_code": 404,
   "message": "No account found with this mobile number. Please register first.",
   "data": {}
 }
@@ -215,6 +265,7 @@ Content-Type: application/json
 // 409 — phone already registered (social context)
 {
   "success": false,
+  "response_code": 409,
   "message": "This mobile number is already registered. Please use a different number or sign in with your existing account.",
   "data": {}
 }
@@ -224,6 +275,7 @@ Content-Type: application/json
 // 429 — OTP rate limit hit (max 5 / hour per phone, 10 / hour per IP)
 {
   "success": false,
+  "response_code": 429,
   "message": "Too many OTP requests. Please try again later.",
   "data": {}
 }
@@ -233,6 +285,7 @@ Content-Type: application/json
 // 502 — SMS gateway error
 {
   "success": false,
+  "response_code": 502,
   "message": "Failed to send OTP. Please try again.",
   "data": {}
 }
@@ -240,7 +293,55 @@ Content-Type: application/json
 
 ---
 
-### 5.2 Login with Password
+### 5.2 Refresh Token
+
+Exchange a valid refresh token for a new access token + refresh token pair. The old refresh token is immediately invalidated (rotation).
+
+```
+POST /auth/refresh
+Content-Type: application/json
+```
+
+#### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | Yes | The refresh token received from the last login or refresh response |
+
+#### Success `200`
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Token refreshed.",
+  "data": {
+    "token": "b4e8a1c3f2d6e9b0a7c4d1e8f5b2a9c6d3e0f7b4a1c8e5d2f9b6a3c0e7d4f1b8",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200
+  }
+}
+```
+
+> `expires_in` is in seconds. `43200` = 12 hours (the configured access token lifetime).  
+> **Always replace both stored tokens** with the values from this response.
+
+#### Errors
+
+```json
+// 401 — refresh token invalid or expired
+{
+  "success": false,
+  "response_code": 401,
+  "message": "Invalid or expired refresh token. Please log in again.",
+  "data": {}
+}
+```
+
+---
+
+### 5.3 Login with Password
+
 
 ```
 POST /auth/login
@@ -260,9 +361,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Login successful!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -276,6 +380,7 @@ Content-Type: application/json
 // 401 — wrong credentials
 {
   "success": false,
+  "response_code": 401,
   "message": "The password you entered is incorrect.",
   "data": {}
 }
@@ -285,6 +390,7 @@ Content-Type: application/json
 // 422 — missing fields
 {
   "success": false,
+  "response_code": 422,
   "message": "Mobile/email and password are required.",
   "data": {}
 }
@@ -294,6 +400,7 @@ Content-Type: application/json
 // 429 — brute-force lockout (5 failed attempts / 15 min per account, 10 per IP)
 {
   "success": false,
+  "response_code": 429,
   "message": "Too many login attempts for this account. Please try again in 15 minutes.",
   "data": {}
 }
@@ -321,9 +428,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Login successful!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -335,6 +445,7 @@ Content-Type: application/json
 // 422 — invalid phone or OTP format
 {
   "success": false,
+  "response_code": 422,
   "message": "OTP must be exactly 6 digits.",
   "data": {}
 }
@@ -344,6 +455,7 @@ Content-Type: application/json
 // 401 — incorrect or expired OTP
 {
   "success": false,
+  "response_code": 401,
   "message": "Incorrect or expired OTP. Please try again.",
   "data": {}
 }
@@ -380,9 +492,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 201,
   "message": "Account created! Welcome aboard.",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -393,9 +508,12 @@ With loyalty enrolment:
 ```json
 {
   "success": true,
+  "response_code": 201,
   "message": "Account created! Welcome aboard. You have joined the Herlan Star Loyalty Programme!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -407,6 +525,7 @@ With loyalty enrolment:
 // 422 — phone or email already taken
 {
   "success": false,
+  "response_code": 422,
   "message": "An account with this phone number already exists.",
   "data": {}
 }
@@ -416,6 +535,7 @@ With loyalty enrolment:
 // 401 — wrong OTP
 {
   "success": false,
+  "response_code": 401,
   "message": "Incorrect or expired OTP. Please try again.",
   "data": {}
 }
@@ -447,9 +567,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Logged in with Google!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -460,6 +583,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Please verify your mobile number to complete sign-in.",
   "data": {
     "need_mobile": true,
@@ -479,6 +603,7 @@ Content-Type: application/json
 // 401 — invalid or expired Google token
 {
   "success": false,
+  "response_code": 401,
   "message": "Invalid Google token.",
   "data": {}
 }
@@ -507,9 +632,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Logged in with Facebook!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -520,6 +648,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Please verify your mobile number to complete sign-in.",
   "data": {
     "need_mobile": true,
@@ -536,6 +665,7 @@ Content-Type: application/json
 // 401 — invalid token
 {
   "success": false,
+  "response_code": 401,
   "message": "Invalid Facebook token.",
   "data": {}
 }
@@ -564,6 +694,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "OTP verified.",
   "data": {}
 }
@@ -575,6 +706,7 @@ Content-Type: application/json
 // 401 — wrong or expired OTP
 {
   "success": false,
+  "response_code": 401,
   "message": "Incorrect or expired OTP. Please try again.",
   "data": {}
 }
@@ -614,9 +746,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Signed in successfully!",
   "data": {
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
+    "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
+    "expires_in": 43200,
     "redirect": "https://your-domain.com"
   }
 }
@@ -628,6 +763,7 @@ Content-Type: application/json
 // 410 — temp_token expired (> 15 minutes old)
 {
   "success": false,
+  "response_code": 410,
   "message": "Session expired. Please try signing in again.",
   "data": {}
 }
@@ -637,6 +773,7 @@ Content-Type: application/json
 // 401 — wrong OTP
 {
   "success": false,
+  "response_code": 401,
   "message": "Incorrect or expired OTP. Please try again.",
   "data": {}
 }
@@ -663,6 +800,7 @@ None required.
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Logged out successfully.",
   "data": {
     "redirect": "https://your-domain.com"
@@ -693,6 +831,7 @@ GET /auth/check-phone?phone=01712345678
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Phone number checked.",
   "data": {
     "valid": true,
@@ -706,6 +845,7 @@ GET /auth/check-phone?phone=01712345678
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Phone number checked.",
   "data": {
     "valid": true,
@@ -719,6 +859,7 @@ GET /auth/check-phone?phone=01712345678
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Phone number checked.",
   "data": {
     "valid": false,
@@ -742,6 +883,7 @@ GET /auth/loyalty-rules
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Loyalty rules retrieved.",
   "data": {
     "rules": [
@@ -764,6 +906,7 @@ GET /auth/loyalty-rules
 // 502 — loyalty API unreachable
 {
   "success": false,
+  "response_code": 502,
   "message": "Failed to load loyalty rules.",
   "data": {}
 }
@@ -794,6 +937,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "OTP sent to your email address.",
   "data": {
     "expiry_seconds": 600
@@ -807,6 +951,7 @@ Content-Type: application/json
 // 404 — no account with this email
 {
   "success": false,
+  "response_code": 404,
   "message": "No account found with this email address.",
   "data": {}
 }
@@ -816,6 +961,7 @@ Content-Type: application/json
 // 429 — resend cooldown active
 {
   "success": false,
+  "response_code": 429,
   "message": "Please wait a moment before requesting another OTP.",
   "data": {}
 }
@@ -825,6 +971,7 @@ Content-Type: application/json
 // 502 — mail server error
 {
   "success": false,
+  "response_code": 502,
   "message": "Mail server returned an error. Please contact support.",
   "data": {}
 }
@@ -854,6 +1001,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "OTP verified. Please set your new password.",
   "data": {
     "reset_token": "aBcDeFgHiJkLmNoPqRsTuVwXyZ123456"
@@ -869,6 +1017,7 @@ Content-Type: application/json
 // 401 — incorrect OTP
 {
   "success": false,
+  "response_code": 401,
   "message": "Incorrect OTP. Please try again.",
   "data": {}
 }
@@ -878,6 +1027,7 @@ Content-Type: application/json
 // 429 — too many incorrect attempts, OTP invalidated
 {
   "success": false,
+  "response_code": 429,
   "message": "Too many incorrect attempts. Please request a new OTP.",
   "data": {}
 }
@@ -887,6 +1037,7 @@ Content-Type: application/json
 // 410 — OTP expired
 {
   "success": false,
+  "response_code": 410,
   "message": "OTP has expired. Please request a new one.",
   "data": {}
 }
@@ -916,6 +1067,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Password reset successfully! You can now log in with your new password.",
   "data": {}
 }
@@ -927,6 +1079,7 @@ Content-Type: application/json
 // 410 — reset_token expired (> 15 minutes)
 {
   "success": false,
+  "response_code": 410,
   "message": "Session expired. Please start over.",
   "data": {}
 }
@@ -936,6 +1089,7 @@ Content-Type: application/json
 // 422 — password too short
 {
   "success": false,
+  "response_code": 422,
   "message": "Password must be at least 6 characters.",
   "data": {}
 }
@@ -945,6 +1099,7 @@ Content-Type: application/json
 // 422 — passwords do not match
 {
   "success": false,
+  "response_code": 422,
   "message": "Passwords do not match.",
   "data": {}
 }
@@ -976,6 +1131,7 @@ Authorization: Bearer <token>
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Addresses retrieved.",
   "data": [
     {
@@ -1021,6 +1177,7 @@ Empty address book:
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Addresses retrieved.",
   "data": []
 }
@@ -1032,6 +1189,7 @@ Empty address book:
 // 401 — missing or invalid token
 {
   "success": false,
+  "response_code": 401,
   "message": "Invalid or expired API token. Please log in again.",
   "data": {}
 }
@@ -1070,6 +1228,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
+  "response_code": 201,
   "message": "Address saved.",
   "data": {
     "address_id": 3,
@@ -1119,6 +1278,7 @@ Content-Type: application/json
 // 422 — missing required fields
 {
   "success": false,
+  "response_code": 422,
   "message": "Required fields missing: phone, address_1",
   "data": {}
 }
@@ -1128,6 +1288,7 @@ Content-Type: application/json
 // 422 — invalid phone
 {
   "success": false,
+  "response_code": 422,
   "message": "Please enter a valid Bangladeshi mobile number (e.g. 01712345678).",
   "data": {}
 }
@@ -1137,6 +1298,7 @@ Content-Type: application/json
 // 422 — invalid district code
 {
   "success": false,
+  "response_code": 422,
   "message": "Please select a valid district.",
   "data": {}
 }
@@ -1162,6 +1324,7 @@ Authorization: Bearer <token>
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Address retrieved.",
   "data": {
     "id": "1",
@@ -1189,6 +1352,7 @@ Authorization: Bearer <token>
 // 404 — address not found or belongs to another user
 {
   "success": false,
+  "response_code": 404,
   "message": "Address not found.",
   "data": {}
 }
@@ -1221,6 +1385,7 @@ Same fields as Create Address. Required fields (`first_name`, `phone`, `address_
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Address updated.",
   "data": {
     "address_id": 1,
@@ -1253,6 +1418,7 @@ Same fields as Create Address. Required fields (`first_name`, `phone`, `address_
 // 404 — address not found
 {
   "success": false,
+  "response_code": 404,
   "message": "Address not found.",
   "data": {}
 }
@@ -1282,6 +1448,7 @@ Returns the updated address list.
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Address deleted.",
   "data": [
     {
@@ -1311,6 +1478,7 @@ Returns the updated address list.
 // 404 — address not found
 {
   "success": false,
+  "response_code": 404,
   "message": "Address not found.",
   "data": {}
 }
@@ -1340,6 +1508,7 @@ Returns the full updated list, default address first.
 ```json
 {
   "success": true,
+  "response_code": 200,
   "message": "Default address updated.",
   "data": [
     {
@@ -1386,6 +1555,7 @@ Returns the full updated list, default address first.
 // 404 — address not found
 {
   "success": false,
+  "response_code": 404,
   "message": "Address not found.",
   "data": {}
 }
@@ -1406,12 +1576,24 @@ App                             API
  |   [user reads SMS code]       |
  |                               |
  |-- POST /auth/login-otp ------>|  X-API-Key: <key>  phone, otp
- |<-- 200 { token, redirect } ---|
+ |<-- 200 { token,               |
+ |    refresh_token,             |
+ |    expires_in, redirect } ----|
  |                               |
- |   [store token securely]      |
+ |   [store both tokens]         |
  |                               |
  |-- GET  /addresses ----------->|  X-API-Key: <key>  Authorization: Bearer <token>
  |<-- 200 { [...addresses] } ----|
+ |                               |
+ |   [token expires → 401]       |
+ |                               |
+ |-- POST /auth/refresh -------->|  X-API-Key: <key>  refresh_token
+ |<-- 200 { token,               |
+ |    refresh_token,             |
+ |    expires_in } --------------|
+ |                               |
+ |   [replace stored tokens]     |
+ |   [retry original request]    |
 ```
 
 ---
@@ -1542,4 +1724,4 @@ Use these for the `state` field in address endpoints.
 
 ---
 
-*Documentation generated for Auth Popup v1.0.14 — 2026-05-03*
+*Documentation generated for Auth Popup v1.0.14 — 2026-05-04 (refresh token system added)*
