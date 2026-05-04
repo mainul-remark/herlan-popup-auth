@@ -38,6 +38,7 @@ class Auth_Popup_REST_API {
         add_action( 'rest_api_init', [ __CLASS__, 'register_routes' ] );
         // Authenticate Bearer tokens so is_user_logged_in() works for address endpoints
         add_filter( 'rest_pre_dispatch',          [ __CLASS__, 'validate_api_key' ], 10, 3 );
+        add_filter( 'rest_post_dispatch',         [ __CLASS__, 'normalize_error_response' ], 10, 3 );
         add_filter( 'determine_current_user',     [ __CLASS__, 'authenticate_token' ], 20 );
         add_filter( 'rest_authentication_errors', [ __CLASS__, 'check_authentication_errors' ] );
     }
@@ -935,6 +936,67 @@ class Auth_Popup_REST_API {
         return $result;
     }
 
+    /**
+     * WordPress filter: rest_post_dispatch.
+     * Normalizes error responses on auth-popup routes to match our response structure,
+     * and converts wrong-method 404s into a clear 405 Method Not Allowed.
+     */
+    public static function normalize_error_response( WP_REST_Response $response, WP_REST_Server $server, WP_REST_Request $request ): WP_REST_Response {
+        $route = $request->get_route();
+
+        if ( strpos( $route, '/' . self::NAMESPACE . '/' ) !== 0 ) {
+            return $response;
+        }
+
+        $status = $response->get_status();
+        $data   = $response->get_data();
+        $code   = $data['code'] ?? '';
+
+        if ( $code === 'rest_no_route' ) {
+            // Check if path matches a registered route — if yes, the method is wrong
+            $routes       = $server->get_routes( self::NAMESPACE );
+            $path_matched = false;
+            foreach ( $routes as $pattern => $handlers ) {
+                if ( preg_match( '@^' . $pattern . '$@i', $route ) ) {
+                    $path_matched = true;
+                    break;
+                }
+            }
+
+            if ( $path_matched ) {
+                return new WP_REST_Response( [
+                    'success'       => false,
+                    'response_code' => 405,
+                    'message'       => sprintf(
+                        /* translators: %s: HTTP method used by the client */
+                        __( 'Method Not Allowed. You used %s. This endpoint only accepts POST requests.', 'auth-popup' ),
+                        $request->get_method()
+                    ),
+                    'data'          => (object) [],
+                ], 405 );
+            }
+
+            return new WP_REST_Response( [
+                'success'       => false,
+                'response_code' => 404,
+                'message'       => __( 'Endpoint not found. Please check the URL.', 'auth-popup' ),
+                'data'          => (object) [],
+            ], 404 );
+        }
+
+        // Reformat any other WP-generated error on our routes (e.g. 403 API key error)
+        if ( ! empty( $code ) && $status >= 400 ) {
+            return new WP_REST_Response( [
+                'success'       => false,
+                'response_code' => $status,
+                'message'       => $data['message'] ?? __( 'An error occurred.', 'auth-popup' ),
+                'data'          => (object) [],
+            ], $status );
+        }
+
+        return $response;
+    }
+
     /* ── Bearer Token Authentication ────────────────────────────────── */
 
     /**
@@ -1128,9 +1190,10 @@ class Auth_Popup_REST_API {
     private static function success( string $message, $data = [], int $status = 200 ): WP_REST_Response {
         return new WP_REST_Response(
             [
-                'success' => true,
-                'message' => $message,
-                'data'    => empty( $data ) ? (object) [] : $data,
+                'success'       => true,
+                'response_code' => $status,
+                'message'       => $message,
+                'data'          => empty( $data ) ? (object) [] : $data,
             ],
             $status
         );
@@ -1139,9 +1202,10 @@ class Auth_Popup_REST_API {
     private static function error( string $message, int $status = 400 ): WP_REST_Response {
         return new WP_REST_Response(
             [
-                'success' => false,
-                'message' => $message,
-                'data'    => (object) [],
+                'success'       => false,
+                'response_code' => $status,
+                'message'       => $message,
+                'data'          => (object) [],
             ],
             $status
         );
