@@ -192,6 +192,15 @@ class Auth_Popup_REST_API {
             ],
         ] );
 
+        register_rest_route( $ns, '/auth/check-email', [
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => [ __CLASS__, 'check_email' ],
+            'permission_callback' => '__return_true',
+            'args'                => [
+                'email' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_email' ],
+            ],
+        ] );
+
         register_rest_route( $ns, '/auth/loyalty-rules', [
             'methods'             => WP_REST_Server::READABLE,
             'callback'            => [ __CLASS__, 'get_loyalty_rules' ],
@@ -635,6 +644,18 @@ class Auth_Popup_REST_API {
         $exists = null !== Auth_Popup_User_Auth::get_user_by_phone( $norm );
 
         return self::success( __( 'Phone number checked.', 'auth-popup' ), [ 'exists' => $exists, 'valid' => true ] );
+    }
+
+    public static function check_email( WP_REST_Request $request ): WP_REST_Response {
+        $email = $request->get_param( 'email' );
+
+        if ( ! is_email( $email ) ) {
+            return self::success( __( 'Email address checked.', 'auth-popup' ), [ 'exists' => false, 'valid' => false ] );
+        }
+
+        $exists = (bool) email_exists( $email );
+
+        return self::success( __( 'Email address checked.', 'auth-popup' ), [ 'exists' => $exists, 'valid' => true ] );
     }
 
     public static function get_loyalty_rules( WP_REST_Request $request ): WP_REST_Response {

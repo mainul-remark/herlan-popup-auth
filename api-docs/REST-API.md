@@ -28,10 +28,11 @@
    - [Social Complete](#59-social-complete)
    - [Logout](#510-logout)
    - [Check Phone](#511-check-phone)
-   - [Loyalty Rules](#512-loyalty-rules)
-   - [Forgot Password](#513-forgot-password)
-   - [Verify Reset OTP](#514-verify-reset-otp)
-   - [Reset Password](#515-reset-password)
+   - [Check Email](#512-check-email)
+   - [Loyalty Rules](#513-loyalty-rules)
+   - [Forgot Password](#514-forgot-password)
+   - [Verify Reset OTP](#515-verify-reset-otp)
+   - [Reset Password](#516-reset-password)
 6. [Address Endpoints](#6-address-endpoints)
    - [List Addresses](#61-list-addresses)
    - [Create Address](#62-create-address)
@@ -873,7 +874,86 @@ GET /auth/check-phone?phone=01712345678
 
 ---
 
-### 5.11 Loyalty Rules
+### 5.11 Check Email
+
+Check whether an email address is already registered. Use this during registration to give real-time feedback before the user proceeds.
+
+```
+GET /auth/check-email?email=user@example.com
+```
+
+#### Query parameters
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Email address to check |
+
+#### Success `200` — valid format, email already registered
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Email address checked.",
+  "data": {
+    "valid": true,
+    "exists": true
+  }
+}
+```
+
+#### Success `200` — valid format, email available
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Email address checked.",
+  "data": {
+    "valid": true,
+    "exists": false
+  }
+}
+```
+
+#### Success `200` — invalid email format
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Email address checked.",
+  "data": {
+    "valid": false,
+    "exists": false
+  }
+}
+```
+
+#### Error `400` — missing `email` parameter
+
+```json
+{
+  "success": false,
+  "response_code": 400,
+  "message": "Missing parameter(s): email",
+  "data": {}
+}
+```
+
+#### Logic table
+
+| `valid` | `exists` | Meaning | Recommended action |
+|---------|----------|---------|-------------------|
+| `false` | `false` | Email string is not a valid address | Show inline format error |
+| `true` | `false` | Valid email, not yet registered | Allow registration to proceed |
+| `true` | `true` | Email already has an account | Block step, prompt user to log in |
+
+> **Note:** `email` is optional during registration. Only call this endpoint when the user has actually typed an email address. If the field is left blank, no check is needed and registration can proceed without it.
+
+---
+
+### 5.12 Loyalty Rules
 
 Fetch Herlan Star Loyalty Programme rules. Results are cached for 5 minutes server-side.
 
@@ -917,7 +997,7 @@ GET /auth/loyalty-rules
 
 ---
 
-### 5.12 Forgot Password
+### 5.13 Forgot Password
 
 Send a 6-digit OTP to an email address to begin the password reset flow.
 
@@ -982,7 +1062,7 @@ Content-Type: application/json
 
 ---
 
-### 5.13 Verify Reset OTP
+### 5.14 Verify Reset OTP
 
 Verify the OTP received by email. On success returns a `reset_token` valid for **15 minutes**.  
 Maximum **5 incorrect attempts** before the OTP is invalidated.
@@ -1048,7 +1128,7 @@ Content-Type: application/json
 
 ---
 
-### 5.14 Reset Password
+### 5.15 Reset Password
 
 Set a new password using the `reset_token` from [Verify Reset OTP](#513-verify-reset-otp).
 
@@ -1732,6 +1812,10 @@ App                             API
  |-- GET /auth/check-phone ----->|  ?phone=01712345678
  |<-- 200 { valid:true,          |
  |           exists:false } -----|  ← safe to register
+ |                               |
+ |-- GET /auth/check-email ----->|  ?email=user@example.com  (only if user typed email)
+ |<-- 200 { valid:true,          |
+ |           exists:false } -----|  ← email available
  |                               |
  |-- POST /auth/send-otp ------->|  phone, context:"register"
  |<-- 200 { expiry_seconds } ----|
