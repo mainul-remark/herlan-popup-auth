@@ -392,6 +392,11 @@
 
         /* ── Forms submit ───────────────────────────────────────────── */
         bindForms() {
+            // Disable Enter-key submission on password-login and register forms
+            this.$ctx.on('keydown', '#ap-login-password-form, #ap-register-form', (e) => {
+                if (e.key === 'Enter') e.preventDefault();
+            });
+
             // Login: Password form
             this.$ctx.on('submit', '#ap-login-password-form', (e) => {
                 e.preventDefault();
