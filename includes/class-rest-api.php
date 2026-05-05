@@ -268,6 +268,13 @@ class Auth_Popup_REST_API {
             'callback'            => [ __CLASS__, 'set_default_address' ],
             'permission_callback' => [ __CLASS__, 'require_login' ],
         ] );
+
+        // ── Admin Settings endpoint ─────────────────────────────────────
+        register_rest_route( $ns, '/settings', [
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => [ __CLASS__, 'get_settings' ],
+            'permission_callback' => [ __CLASS__, 'require_admin' ],
+        ] );
     }
 
     /* ── Auth Callbacks ──────────────────────────────────────────────── */
@@ -896,6 +903,15 @@ class Auth_Popup_REST_API {
         return self::success( __( 'Address deleted.', 'auth-popup' ), $addresses );
     }
 
+    public static function get_settings( WP_REST_Request $request ): WP_REST_Response {
+        $settings = wp_parse_args(
+            get_option( 'auth_popup_settings', [] ),
+            Auth_Popup_Core::default_settings()
+        );
+
+        return self::success( __( 'Settings retrieved.', 'auth-popup' ), $settings );
+    }
+
     public static function set_default_address( WP_REST_Request $request ): WP_REST_Response {
         $id   = (int) $request->get_param( 'id' );
         $done = Auth_Popup_Address_Manager::set_default( get_current_user_id(), $id );
@@ -914,6 +930,20 @@ class Auth_Popup_REST_API {
     }
 
     /* ── Permission Callbacks ────────────────────────────────────────── */
+
+    /**
+     * @return true|WP_Error
+     */
+    public static function require_admin() {
+        if ( current_user_can( 'manage_options' ) ) {
+            return true;
+        }
+        return new WP_Error(
+            'rest_forbidden',
+            __( 'You do not have permission to access this resource.', 'auth-popup' ),
+            [ 'status' => 403 ]
+        );
+    }
 
     /**
      * @return true|WP_Error

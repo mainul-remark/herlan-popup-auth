@@ -20,6 +20,7 @@ class Auth_Popup_Ajax_Handler {
             'auth_popup_social_complete',
             'auth_popup_logout',
             'auth_popup_check_phone',
+            'auth_popup_check_email',
             'auth_popup_get_loyalty_rules',
             'auth_popup_forgot_password',
             'auth_popup_verify_forgot_otp',
@@ -741,6 +742,20 @@ class Auth_Popup_Ajax_Handler {
         $norm   = Auth_Popup_SMS_Service::normalise_phone( $phone );
         $exists = null !== Auth_Popup_User_Auth::get_user_by_phone( $norm );
 
+        self::success( [ 'exists' => $exists, 'valid' => true ] );
+    }
+
+    /* ── Check Email (for registration) ────────────────────────────── */
+
+    public static function auth_popup_check_email(): void {
+        self::verify_nonce();
+
+        $email = sanitize_email( $_POST['email'] ?? '' );
+        if ( ! is_email( $email ) ) {
+            self::success( [ 'exists' => false, 'valid' => false ] );
+        }
+
+        $exists = (bool) email_exists( $email );
         self::success( [ 'exists' => $exists, 'valid' => true ] );
     }
 

@@ -39,8 +39,10 @@
    - [Update Address](#64-update-address)
    - [Delete Address](#65-delete-address)
    - [Set Default Address](#66-set-default-address)
-7. [Flow Diagrams](#7-flow-diagrams)
-8. [Bangladesh District Codes](#8-bangladesh-district-codes)
+7. [Admin Settings](#7-admin-settings)
+   - [Get Settings](#71-get-settings)
+8. [Flow Diagrams](#8-flow-diagrams)
+9. [Bangladesh District Codes](#9-bangladesh-district-codes)
 
 ---
 
@@ -48,10 +50,11 @@
 
 All endpoints live under `/wp-json/auth-popup/v1/`.
 
-| Group | Path prefix | API Key | Bearer Token |
-|-------|-------------|---------|--------------|
-| Authentication | `/auth/` | Required | Not required |
-| Address book | `/addresses/` | Required | Required |
+| Group | Path prefix | API Key | Bearer Token | Admin |
+|-------|-------------|---------|--------------|-------|
+| Authentication | `/auth/` | Required | Not required | No |
+| Address book | `/addresses/` | Required | Required | No |
+| Admin Settings | `/settings` | Required | Not required | **Yes** |
 
 The `X-API-Key` header is required on **every** request. The app obtains a Bearer token by calling any login endpoint and uses it for address requests.
 
@@ -1212,7 +1215,7 @@ Content-Type: application/json
 | `first_name` | string | **Yes** | First name |
 | `phone` | string | **Yes** | Contact phone (Bangladeshi format) |
 | `address_1` | string | **Yes** | Street address line 1 |
-| `state` | string | **Yes** | Bangladesh district code (e.g. `BD-06`) — see §8 |
+| `state` | string | **Yes** | Bangladesh district code (e.g. `BD-06`) — see §9 |
 | `label` | string | No | Nickname, e.g. `Home`, `Office` |
 | `last_name` | string | No | Last name |
 | `company` | string | No | Company name |
@@ -1563,7 +1566,130 @@ Returns the full updated list, default address first.
 
 ---
 
-## 7. Flow Diagrams
+## 7. Admin Settings
+
+---
+
+### 7.1 Get Settings
+
+Retrieve all plugin configuration settings. Returns the complete `auth_popup_settings` option merged with defaults.
+
+> **Admin only.** The caller must be authenticated as a WordPress administrator (`manage_options` capability). Use WordPress cookie auth or a [WP Application Password](https://developer.wordpress.org/rest-api/using-the-rest-api/authentication/) — the plugin's Bearer token is **not** accepted here because it represents a regular user, not an admin.
+
+```
+GET /settings
+X-API-Key: <api-key>
+Authorization: Basic <base64(username:application-password)>
+```
+
+#### Success `200`
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Settings retrieved.",
+  "data": {
+    "sms_api_token": "sk-live-xxxxxxxxxxxx",
+    "sms_sender_id": "HERLAN",
+    "sms_base_url": "https://se.smsplus.net/api/v1",
+    "google_client_id": "123456789-abc.apps.googleusercontent.com",
+    "google_client_secret": "GOCSPX-xxxxxxxxxxxx",
+    "fb_app_id": "9876543210",
+    "fb_app_secret": "xxxxxxxxxxxxxxxxxxxx",
+    "loyalty_enabled": "1",
+    "loyalty_api_url": "https://loyalty.herlan.store/api/customer",
+    "redirect_url": "https://your-domain.com",
+    "trigger_selector": ".auth-popup-trigger",
+    "otp_expiry_minutes": 5,
+    "otp_max_per_hour": 5,
+    "otp_max_per_hour_ip": 10,
+    "otp_max_verify_attempts": 5,
+    "enable_password_login": "1",
+    "enable_otp_login": "1",
+    "enable_google": "1",
+    "enable_facebook": "1",
+    "popup_logo_url": "https://your-domain.com/logo.png",
+    "popup_brand_name": "Herlan",
+    "checkout_hide_shipping_form": "1",
+    "checkout_disable_ship_to_different": "1",
+    "myaccount_inline_form": "1",
+    "rest_api_key": "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9",
+    "token_lifetime_hours": 12,
+    "refresh_token_lifetime_days": 7
+  }
+}
+```
+
+#### Settings reference
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `sms_api_token` | string | `""` | Bearer token for SSLCommerce iSMS Plus |
+| `sms_sender_id` | string | `""` | Approved SMS sender ID / mask |
+| `sms_base_url` | string | `"https://se.smsplus.net/api/v1"` | SSLCommerce API base URL |
+| `google_client_id` | string | `""` | Google OAuth client ID |
+| `google_client_secret` | string | `""` | Google OAuth client secret |
+| `fb_app_id` | string | `""` | Facebook App ID |
+| `fb_app_secret` | string | `""` | Facebook App Secret |
+| `loyalty_enabled` | string | `"1"` | `"1"` = loyalty programme enabled |
+| `loyalty_api_url` | string | `""` | Herlan Loyalty API base URL |
+| `redirect_url` | string | site home | Post-login redirect URL |
+| `trigger_selector` | string | `".auth-popup-trigger"` | CSS selector that opens the popup |
+| `otp_expiry_minutes` | integer | `5` | OTP validity (1–30 min) |
+| `otp_max_per_hour` | integer | `5` | Max OTP sends per phone per hour |
+| `otp_max_per_hour_ip` | integer | `10` | Max OTP sends per IP per hour |
+| `otp_max_verify_attempts` | integer | `5` | Max wrong OTP guesses before invalidation |
+| `enable_password_login` | string | `"1"` | `"1"` = password login enabled |
+| `enable_otp_login` | string | `"1"` | `"1"` = OTP login enabled |
+| `enable_google` | string | `"1"` | `"1"` = Google login button shown |
+| `enable_facebook` | string | `"1"` | `"1"` = Facebook login button shown |
+| `popup_logo_url` | string | `""` | Logo URL displayed in the popup |
+| `popup_brand_name` | string | site name | Brand name in the popup header |
+| `checkout_hide_shipping_form` | string | `"1"` | Auto-hide shipping form when addresses exist |
+| `checkout_disable_ship_to_different` | string | `"1"` | Hide "Ship to different address" option |
+| `myaccount_inline_form` | string | `"1"` | Use inline form on `/my-account` |
+| `rest_api_key` | string | auto-generated | The `X-API-Key` value for this installation |
+| `token_lifetime_hours` | integer | `12` | Access token lifetime in hours (1–168) |
+| `refresh_token_lifetime_days` | integer | `7` | Refresh token lifetime in days (1–365) |
+
+> Boolean-style settings use string `"1"` (enabled) or `"0"` (disabled), not JSON booleans.
+
+#### Errors
+
+```json
+// 401 — not authenticated
+{
+  "success": false,
+  "response_code": 401,
+  "message": "Authentication required. Please log in to access this resource.",
+  "data": {}
+}
+```
+
+```json
+// 403 — authenticated but not an admin
+{
+  "success": false,
+  "response_code": 403,
+  "message": "You do not have permission to access this resource.",
+  "data": {}
+}
+```
+
+```json
+// 403 — missing or invalid X-API-Key (when a key is configured on the server)
+{
+  "success": false,
+  "response_code": 403,
+  "message": "Invalid or missing API key.",
+  "data": {}
+}
+```
+
+---
+
+## 8. Flow Diagrams
 
 ### Phone OTP Login
 
@@ -1683,7 +1809,7 @@ App                             API
 
 ---
 
-## 8. Bangladesh District Codes
+## 9. Bangladesh District Codes
 
 Use these for the `state` field in address endpoints.
 
@@ -1724,4 +1850,4 @@ Use these for the `state` field in address endpoints.
 
 ---
 
-*Documentation generated for Auth Popup v1.0.14 — 2026-05-04 (refresh token system added)*
+*Documentation generated for Auth Popup v1.0.14 — 2026-05-05 (admin settings endpoint added)*

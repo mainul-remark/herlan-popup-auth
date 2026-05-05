@@ -181,6 +181,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                                placeholder="<?php esc_attr_e( 'Email address (Optional)', 'auth-popup' ); ?>"
                                autocomplete="email">
                     </div>
+                    <span class="ap-email-check-msg"></span>
                 </div>
 
                 <button type="button" class="ap-btn ap-btn-primary ap-send-otp-btn" data-form="register">

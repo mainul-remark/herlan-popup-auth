@@ -49,6 +49,7 @@
             this.bindForms();
             this.bindPasswordToggle();
             this.bindPhoneCheck();
+            this.bindEmailCheck();
             this.bindLoyaltyToggle();
             this.bindSwitchLinks();
             this.bindForgotPanel();
@@ -526,11 +527,54 @@
                                 $otpBtn.prop('disabled', true);
                             } else {
                                 $msg.text('Mobile number available.').addClass('free');
-                                $otpBtn.prop('disabled', false);
+                                const emailTaken = $input.closest('form').find('.ap-email-check-msg').hasClass('taken');
+                                $otpBtn.prop('disabled', emailTaken);
                             }
                         },
                         error: () => {
                             // On network failure don't block the user
+                            $otpBtn.prop('disabled', false);
+                        },
+                    });
+                }, 600);
+            });
+        },
+
+        /* ── Email availability check (registration) ────────────────── */
+        bindEmailCheck() {
+            let debounceTimer;
+            this.$ctx.on('input', '#ap-reg-email', (e) => {
+                clearTimeout(debounceTimer);
+                const $input  = $(e.currentTarget);
+                const $msg    = $input.closest('.ap-field').find('.ap-email-check-msg');
+                const $otpBtn = this.$ctx.find('.ap-send-otp-btn[data-form="register"]');
+                const email   = $input.val().trim();
+
+                $msg.text('').removeClass('taken free');
+
+                if (!email) {
+                    const phoneTaken = $input.closest('form').find('.ap-phone-check-msg').hasClass('taken');
+                    $otpBtn.prop('disabled', phoneTaken);
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    $.ajax({
+                        url:    AuthPopup.ajaxUrl,
+                        method: 'POST',
+                        data:   { action: 'auth_popup_check_email', nonce: AuthPopup.nonce, email },
+                        success: (res) => {
+                            if (!res.success || !res.data.valid) return;
+                            if (res.data.exists) {
+                                $msg.text('An account with this email already exists. Please login instead.').addClass('taken');
+                                $otpBtn.prop('disabled', true);
+                            } else {
+                                $msg.text('Email address available.').addClass('free');
+                                const phoneTaken = $input.closest('form').find('.ap-phone-check-msg').hasClass('taken');
+                                $otpBtn.prop('disabled', phoneTaken);
+                            }
+                        },
+                        error: () => {
                             $otpBtn.prop('disabled', false);
                         },
                     });

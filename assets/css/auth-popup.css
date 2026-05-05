@@ -2598,3 +2598,6 @@
         margin: 20px auto;
     }
 }
+
+.taken {color: red}
+.free {color: green}
