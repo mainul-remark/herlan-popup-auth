@@ -1,6 +1,6 @@
 # Auth Popup — REST API Documentation
 
-> **Plugin:** Auth Popup v1.0.14  
+> **Plugin:** Auth Popup v1.0.15  
 > **Base URL:** `https://your-domain.com/wp-json/auth-popup/v1`  
 > **Format:** JSON  
 > **Encoding:** UTF-8
@@ -16,34 +16,35 @@
    - [Refresh Token](#23-refresh-token)
 3. [Standard Response Envelope](#3-standard-response-envelope)
 4. [HTTP Status Codes](#4-http-status-codes)
-5. [Auth Endpoints](#5-auth-endpoints)
-   - [Send OTP](#51-send-otp)
-   - [Refresh Token](#52-refresh-token)
-   - [Login with Password](#53-login-with-password)
-   - [Login with OTP](#54-login-with-otp)
-   - [Register](#55-register)
-   - [Google OAuth](#56-google-oauth)
-   - [Facebook OAuth](#57-facebook-oauth)
-   - [Verify OTP (Peek)](#58-verify-otp-peek)
-   - [Social Complete](#59-social-complete)
-   - [Logout](#510-logout)
-   - [Check Phone](#511-check-phone)
-   - [Check Email](#512-check-email)
-   - [Loyalty Rules](#513-loyalty-rules)
-   - [Forgot Password](#514-forgot-password)
-   - [Verify Reset OTP](#515-verify-reset-otp)
-   - [Reset Password](#516-reset-password)
-6. [Address Endpoints](#6-address-endpoints)
-   - [List Addresses](#61-list-addresses)
-   - [Create Address](#62-create-address)
-   - [Get Address](#63-get-address)
-   - [Update Address](#64-update-address)
-   - [Delete Address](#65-delete-address)
-   - [Set Default Address](#66-set-default-address)
-7. [Admin Settings](#7-admin-settings)
-   - [Get Settings](#71-get-settings)
-8. [Flow Diagrams](#8-flow-diagrams)
-9. [Bangladesh District Codes](#9-bangladesh-district-codes)
+5. [User Object](#5-user-object)
+6. [Auth Endpoints](#6-auth-endpoints)
+   - [Send OTP](#61-send-otp)
+   - [Refresh Token](#62-refresh-token)
+   - [Login with Password](#63-login-with-password)
+   - [Login with OTP](#64-login-with-otp)
+   - [Register](#65-register)
+   - [Google OAuth](#66-google-oauth)
+   - [Facebook OAuth](#67-facebook-oauth)
+   - [Verify OTP (Peek)](#68-verify-otp-peek)
+   - [Social Complete](#69-social-complete)
+   - [Logout](#610-logout)
+   - [Check Phone](#611-check-phone)
+   - [Check Email](#612-check-email)
+   - [Loyalty Rules](#613-loyalty-rules)
+   - [Forgot Password](#614-forgot-password)
+   - [Verify Reset OTP](#615-verify-reset-otp)
+   - [Reset Password](#616-reset-password)
+7. [Address Endpoints](#7-address-endpoints)
+   - [List Addresses](#71-list-addresses)
+   - [Create Address](#72-create-address)
+   - [Get Address](#73-get-address)
+   - [Update Address](#74-update-address)
+   - [Delete Address](#75-delete-address)
+   - [Set Default Address](#76-set-default-address)
+8. [Admin Settings](#8-admin-settings)
+   - [Get Settings](#81-get-settings)
+9. [Flow Diagrams](#9-flow-diagrams)
+10. [Bangladesh District Codes](#10-bangladesh-district-codes)
 
 ---
 
@@ -204,11 +205,58 @@ Every response — success or error — uses this JSON structure:
 
 ---
 
-## 5. Auth Endpoints
+## 5. User Object
+
+Every endpoint that issues tokens — login, register, Google, Facebook, social-complete, and token refresh — now includes a `user` object in the response `data`. This lets the app populate the user profile immediately after authentication without making an extra request.
+
+```json
+{
+  "id": 42,
+  "name": "John Doe",
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john@example.com",
+  "username": "john.doe",
+  "roles": ["customer"],
+  "avatar": "https://secure.gravatar.com/avatar/abc123?s=96&d=mm&r=g",
+  "phone": "8801712345678",
+  "has_password": true
+}
+```
+
+### User object fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | WordPress user ID |
+| `name` | string | Display name |
+| `first_name` | string | First name |
+| `last_name` | string | Last name |
+| `email` | string | Email address |
+| `username` | string | WordPress login username |
+| `roles` | array | WordPress roles (e.g. `["customer"]`) |
+| `avatar` | string\|null | Gravatar URL (96 px) or `null` if none |
+| `phone` | string\|null | Verified mobile number in E.164 format, or `null` if not set |
+| `has_password` | boolean | Whether the user has explicitly set their own password |
+
+### `has_password` explained
+
+| Value | Meaning | Typical scenario |
+|-------|---------|-----------------|
+| `true` | User set their own password | Registered with phone + password, or reset password via forgot-password flow |
+| `false` | No user-set password exists | Registered via Google / Facebook OAuth (a random internal password was generated) |
+
+Use this flag to decide whether to show a **"Set a password"** prompt vs a **"Change password"** form in your app's account settings screen.
+
+> **Note:** `phone` returns the number from the auth-popup verified phone profile first, falling back to the WooCommerce `billing_phone` meta if no verified number is on record.
 
 ---
 
-### 5.1 Send OTP
+## 6. Auth Endpoints
+
+---
+
+### 6.1 Send OTP
 
 
 Send a 6-digit OTP via SMS to a phone number.
@@ -297,7 +345,7 @@ Content-Type: application/json
 
 ---
 
-### 5.2 Refresh Token
+### 6.2 Refresh Token
 
 Exchange a valid refresh token for a new access token + refresh token pair. The old refresh token is immediately invalidated (rotation).
 
@@ -322,13 +370,26 @@ Content-Type: application/json
   "data": {
     "token": "b4e8a1c3f2d6e9b0a7c4d1e8f5b2a9c6d3e0f7b4a1c8e5d2f9b6a3c0e7d4f1b8",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
-    "expires_in": 43200
+    "expires_in": 43200,
+    "user": {
+      "id": 42,
+      "name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com",
+      "username": "john.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/abc123?s=96&d=mm&r=g",
+      "phone": "8801712345678",
+      "has_password": true
+    }
   }
 }
 ```
 
 > `expires_in` is in seconds. `43200` = 12 hours (the configured access token lifetime).  
-> **Always replace both stored tokens** with the values from this response.
+> **Always replace both stored tokens** with the values from this response.  
+> Use the returned `user` object to refresh locally cached profile data.
 
 #### Errors
 
@@ -344,7 +405,7 @@ Content-Type: application/json
 
 ---
 
-### 5.3 Login with Password
+### 6.3 Login with Password
 
 
 ```
@@ -371,12 +432,25 @@ Content-Type: application/json
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
-    "redirect": "https://your-domain.com"
+    "redirect": "https://your-domain.com",
+    "user": {
+      "id": 42,
+      "name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com",
+      "username": "john.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/abc123?s=96&d=mm&r=g",
+      "phone": "8801712345678",
+      "has_password": true
+    }
   }
 }
 ```
 
-> **Save `token`** immediately. Use it in the `Authorization: Bearer` header for all address requests.
+> **Save `token`** immediately. Use it in the `Authorization: Bearer` header for all address requests.  
+> See [§5 User Object](#5-user-object) for a full description of the `user` fields.
 
 #### Errors
 
@@ -412,7 +486,7 @@ Content-Type: application/json
 
 ---
 
-### 5.3 Login with OTP
+### 6.4 Login with OTP
 
 ```
 POST /auth/login-otp
@@ -438,7 +512,19 @@ Content-Type: application/json
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
-    "redirect": "https://your-domain.com"
+    "redirect": "https://your-domain.com",
+    "user": {
+      "id": 42,
+      "name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com",
+      "username": "john.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/abc123?s=96&d=mm&r=g",
+      "phone": "8801712345678",
+      "has_password": false
+    }
   }
 }
 ```
@@ -467,7 +553,7 @@ Content-Type: application/json
 
 ---
 
-### 5.4 Register
+### 6.5 Register
 
 Create a new account. OTP must have been sent first via [Send OTP](#51-send-otp) with `context: register`.
 
@@ -502,7 +588,19 @@ Content-Type: application/json
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
-    "redirect": "https://your-domain.com"
+    "redirect": "https://your-domain.com",
+    "user": {
+      "id": 43,
+      "name": "Jane Doe",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "email": "jane@example.com",
+      "username": "jane.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/def456?s=96&d=mm&r=g",
+      "phone": "8801812345678",
+      "has_password": true
+    }
   }
 }
 ```
@@ -518,7 +616,19 @@ With loyalty enrolment:
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
-    "redirect": "https://your-domain.com"
+    "redirect": "https://your-domain.com",
+    "user": {
+      "id": 43,
+      "name": "Jane Doe",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "email": "jane@example.com",
+      "username": "jane.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/def456?s=96&d=mm&r=g",
+      "phone": "8801812345678",
+      "has_password": true
+    }
   }
 }
 ```
@@ -547,7 +657,7 @@ With loyalty enrolment:
 
 ---
 
-### 5.5 Google OAuth
+### 6.6 Google OAuth
 
 Authenticate with a Google access token obtained from the Google Sign-In SDK.
 
@@ -577,7 +687,19 @@ Content-Type: application/json
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
-    "redirect": "https://your-domain.com"
+    "redirect": "https://your-domain.com",
+    "user": {
+      "id": 42,
+      "name": "John Doe",
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com",
+      "username": "john.doe",
+      "roles": ["customer"],
+      "avatar": "https://secure.gravatar.com/avatar/abc123?s=96&d=mm&r=g",
+      "phone": "8801712345678",
+      "has_password": false
+    }
   }
 }
 ```
@@ -598,7 +720,7 @@ Content-Type: application/json
 }
 ```
 
-> When `need_mobile` is `true`: call [Send OTP](#51-send-otp) with `context: social`, then call [Social Complete](#58-social-complete) with the `temp_token`.  
+> When `need_mobile` is `true`: call [Send OTP](#61-send-otp) with `context: social`, then call [Social Complete](#69-social-complete) with the `temp_token`.  
 > `temp_token` expires in **15 minutes**.
 
 #### Errors
