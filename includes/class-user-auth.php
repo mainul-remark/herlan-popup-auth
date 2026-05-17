@@ -116,6 +116,7 @@ class Auth_Popup_User_Auth {
         // Store phone in dedicated profiles table (fast indexed lookup)
         self::upsert_profile( $user_id, [ 'phone' => $phone ] );
         update_user_meta( $user_id, 'billing_phone', $phone ); // WooCommerce compat
+        update_user_meta( $user_id, '_herlan_has_password', '1' );
 
         $user = get_user_by( 'ID', $user_id );
 

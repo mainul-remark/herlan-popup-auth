@@ -350,7 +350,7 @@ class Auth_Popup_REST_API {
 
         return self::success(
             __( 'Login successful!', 'auth-popup' ),
-            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
+            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] )
         );
     }
 
@@ -385,7 +385,7 @@ class Auth_Popup_REST_API {
 
         return self::success(
             __( 'Login successful!', 'auth-popup' ),
-            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
+            array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] )
         );
     }
 
@@ -436,7 +436,7 @@ class Auth_Popup_REST_API {
             $message .= ' ' . $loyalty_note;
         }
 
-        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] ), 201 );
+        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] ), 201 );
     }
 
     public static function google_auth( WP_REST_Request $request ): WP_REST_Response {
@@ -460,7 +460,7 @@ class Auth_Popup_REST_API {
                     $tokens = self::generate_token( $user->ID );
                     return self::success(
                         __( 'Logged in with Google!', 'auth-popup' ),
-                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
+                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] )
                     );
                 }
             }
@@ -505,7 +505,7 @@ class Auth_Popup_REST_API {
                     $tokens = self::generate_token( $user->ID );
                     return self::success(
                         __( 'Logged in with Facebook!', 'auth-popup' ),
-                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] )
+                        array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] )
                     );
                 }
             }
@@ -601,7 +601,7 @@ class Auth_Popup_REST_API {
             $message .= ' ' . $loyalty_note;
         }
 
-        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ) ] ) );
+        return self::success( $message, array_merge( $tokens, [ 'redirect' => self::redirect_url( $request ), 'user' => self::format_user( $user ) ] ) );
     }
 
     public static function logout( WP_REST_Request $request ): WP_REST_Response {
@@ -629,8 +629,9 @@ class Auth_Popup_REST_API {
         self::revoke_refresh_token( $refresh_token );
 
         $tokens = self::generate_token( $user_id );
+        $user   = get_user_by( 'id', $user_id );
 
-        return self::success( __( 'Token refreshed.', 'auth-popup' ), $tokens );
+        return self::success( __( 'Token refreshed.', 'auth-popup' ), array_merge( $tokens, $user ? [ 'user' => self::format_user( $user ) ] : [] ) );
     }
 
     public static function check_phone( WP_REST_Request $request ): WP_REST_Response {
@@ -1297,6 +1298,30 @@ class Auth_Popup_REST_API {
         }
 
         return '(' . ( $body['message'] ?? __( 'Loyalty registration failed.', 'auth-popup' ) ) . ')';
+    }
+
+    /* ── User Formatting ────────────────────────────────────────────── */
+
+    private static function format_user( WP_User $user ): array {
+        // Delegate to herlan-rest-api's Response class if available (keeps phone + has_password in sync)
+        if ( class_exists( '\HerlanRestApi\Support\Response' ) ) {
+            return \HerlanRestApi\Support\Response::user( $user );
+        }
+
+        $phone = Auth_Popup_User_Auth::get_user_phone( $user->ID );
+
+        return [
+            'id'           => $user->ID,
+            'name'         => $user->display_name,
+            'first_name'   => $user->first_name,
+            'last_name'    => $user->last_name,
+            'email'        => $user->user_email,
+            'username'     => $user->user_login,
+            'roles'        => array_values( $user->roles ),
+            'avatar'       => get_avatar_url( $user->ID, [ 'size' => 96 ] ) ?: null,
+            'phone'        => $phone !== '' ? $phone : null,
+            'has_password' => get_user_meta( $user->ID, '_herlan_has_password', true ) === '1',
+        ];
     }
 
     /* ── Response Helpers ────────────────────────────────────────────── */

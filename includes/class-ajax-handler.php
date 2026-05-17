@@ -722,6 +722,7 @@ class Auth_Popup_Ajax_Handler {
         }
 
         wp_set_password( $new_password, $user->ID );
+        update_user_meta( $user->ID, '_herlan_has_password', '1' );
         delete_transient( 'ap_fp_rt_' . $reset_token );
 
         self::success( [
