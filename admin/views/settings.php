@@ -403,7 +403,7 @@
     function apUdmStartPolling() {
         apUdmFetch();
         clearInterval(udmPollTimer);
-        udmPollTimer = setInterval(apUdmFetch, 4000);
+        udmPollTimer = setInterval(apUdmFetch, 12000);
     }
 
     // Auto-start polling when Migration tab is opened

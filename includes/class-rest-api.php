@@ -1267,21 +1267,24 @@ class Auth_Popup_REST_API {
         ];
 
         $login_res = wp_remote_post( $api_url . '/login', [
-            'timeout' => 10,
+            'timeout' => 6,
             'headers' => [ 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( [ 'phone' => $phone ] ),
         ] );
 
-        if ( ! is_wp_error( $login_res ) ) {
-            $login_body = json_decode( wp_remote_retrieve_body( $login_res ), true );
-            if ( ! empty( $login_body['success'] ) ) {
-                update_user_meta( $user->ID, 'herlan_loyalty_registered', '1' );
-                return __( 'You are already a loyal member!', 'auth-popup' );
-            }
+        if ( is_wp_error( $login_res ) ) {
+            // Loyalty API unreachable — skip the second call rather than waiting out another timeout.
+            return '';
+        }
+
+        $login_body = json_decode( wp_remote_retrieve_body( $login_res ), true );
+        if ( ! empty( $login_body['success'] ) ) {
+            update_user_meta( $user->ID, 'herlan_loyalty_registered', '1' );
+            return __( 'You are already a loyal member!', 'auth-popup' );
         }
 
         $response = wp_remote_post( $api_url . '/registration', [
-            'timeout' => 10,
+            'timeout' => 6,
             'headers' => [ 'Content-Type' => 'application/json' ],
             'body'    => wp_json_encode( $data ),
         ] );

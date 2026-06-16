@@ -296,7 +296,16 @@ class Auth_Popup_User_Auth {
             'number'     => 1,
         ] );
 
-        return ! empty( $users ) ? $users[0] : null;
+        if ( empty( $users ) ) {
+            return null;
+        }
+
+        // Self-heal: backfill the indexed profiles table now, so this user's
+        // next lookup hits the fast path instead of repeating the usermeta scan
+        // while waiting for the background migration batch to reach them.
+        self::upsert_profile( $users[0]->ID, [ 'phone' => $phone ] );
+
+        return $users[0];
     }
 
     private static function create_user_by_phone( string $phone ) {

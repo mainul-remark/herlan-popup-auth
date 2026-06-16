@@ -58,6 +58,9 @@ class Auth_Popup_Core {
             update_option( 'auth_popup_settings', $settings );
         }
 
+        // Keep the in-request settings cache fresh whenever the option is saved
+        add_action( 'update_option_auth_popup_settings', [ __CLASS__, 'clear_settings_cache' ] );
+
         // Boot modules
         Auth_Popup_Ajax_Handler::init();
         Auth_Popup_REST_API::init();
@@ -638,11 +641,21 @@ class Auth_Popup_Core {
         ];
     }
 
+    /** Per-request cache for get_setting(), invalidated on option update. */
+    private static ?array $settings_cache = null;
+
+    public static function clear_settings_cache(): void {
+        self::$settings_cache = null;
+    }
+
     /**
      * Retrieve a specific setting value.
      */
     public static function get_setting( string $key, $default = null ) {
-        $settings = get_option( 'auth_popup_settings', self::default_settings() );
-        return $settings[ $key ] ?? $default;
+        if ( null === self::$settings_cache ) {
+            $stored = get_option( 'auth_popup_settings' );
+            self::$settings_cache = is_array( $stored ) ? $stored : self::default_settings();
+        }
+        return self::$settings_cache[ $key ] ?? $default;
     }
 }

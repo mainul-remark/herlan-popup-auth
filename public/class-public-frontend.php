@@ -61,23 +61,31 @@ class Auth_Popup_Public_Frontend {
             AUTH_POPUP_VERSION
         );
 
-        // Google Identity Services — load whenever Google login is enabled
-        if ( ! empty( $s['enable_google'] ) ) {
+        // Google Identity Services, Facebook SDK, and the date-of-birth datepicker
+        // are only used on the guest login/registration screens (popup.php,
+        // inline-form.php) — logged-in users never see those fields, so skip
+        // loading these for them.
+        $needs_guest_assets = ! is_user_logged_in();
+
+        if ( $needs_guest_assets && ! empty( $s['enable_google'] ) ) {
             wp_enqueue_script( 'google-gsi', 'https://accounts.google.com/gsi/client', [], null, true );
         }
 
-        // Facebook SDK — load whenever Facebook login is enabled
-        if ( ! empty( $s['enable_facebook'] ) ) {
+        if ( $needs_guest_assets && ! empty( $s['enable_facebook'] ) ) {
             wp_enqueue_script( 'facebook-sdk', 'https://connect.facebook.net/en_US/sdk.js', [], null, true );
         }
 
-        // Main JS
-        wp_enqueue_script( 'jquery-ui-datepicker' );
+        $auth_popup_deps = [ 'jquery' ];
+        if ( $needs_guest_assets ) {
+            wp_enqueue_script( 'jquery-ui-datepicker' );
+            $auth_popup_deps[] = 'jquery-ui-datepicker';
+        }
 
+        // Main JS
         wp_enqueue_script(
             'auth-popup',
             AUTH_POPUP_URL . 'assets/js/auth-popup.js',
-            [ 'jquery', 'jquery-ui-datepicker' ],
+            $auth_popup_deps,
             AUTH_POPUP_VERSION,
             true
         );
@@ -289,7 +297,13 @@ class Auth_Popup_Public_Frontend {
             return [];
         }
 
-        $user_id   = get_current_user_id();
+        $user_id    = get_current_user_id();
+        $cache_key  = 'auth_popup_acct_summary_' . $user_id;
+        $cached     = get_transient( $cache_key );
+        if ( false !== $cached ) {
+            return $cached;
+        }
+
         $user      = wp_get_current_user();
         $phone     = Auth_Popup_User_Auth::get_user_phone( $user_id );
         $addresses = Auth_Popup_Address_Manager::get_addresses( $user_id );
@@ -309,7 +323,7 @@ class Auth_Popup_Public_Frontend {
             }
         }
 
-        return [
+        $summary = [
             'name'          => $user->display_name ?: $user->user_login,
             'email'         => $user->user_email,
             'phone'         => $phone,
@@ -318,6 +332,12 @@ class Auth_Popup_Public_Frontend {
             'addressCount'  => count( $addresses ),
             'wishlistCount' => $wishlist_count,
         ];
+
+        // Short TTL: avoids re-querying phone/addresses/orders on every account
+        // page request without risking long-lived staleness after an edit.
+        set_transient( $cache_key, $summary, 60 );
+
+        return $summary;
     }
 
     private static function get_user_avatar_url( int $user_id ): string {

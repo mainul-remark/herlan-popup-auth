@@ -24,7 +24,7 @@ class Auth_Popup_OAuth_Handler {
         $response = wp_remote_get(
             'https://www.googleapis.com/oauth2/v3/userinfo',
             [
-                'timeout' => 15,
+                'timeout' => 8,
                 'headers' => [ 'Authorization' => 'Bearer ' . $access_token ],
             ]
         );
@@ -76,7 +76,7 @@ class Auth_Popup_OAuth_Handler {
             'access_token' => $app_token,
         ], 'https://graph.facebook.com/debug_token' );
 
-        $debug_res = wp_remote_get( $debug_url, [ 'timeout' => 15 ] );
+        $debug_res = wp_remote_get( $debug_url, [ 'timeout' => 8 ] );
 
         if ( is_wp_error( $debug_res ) ) {
             return $debug_res;
@@ -98,7 +98,7 @@ class Auth_Popup_OAuth_Handler {
             'access_token' => $access_token,
         ], 'https://graph.facebook.com/v19.0/me' );
 
-        $me_res = wp_remote_get( $me_url, [ 'timeout' => 15 ] );
+        $me_res = wp_remote_get( $me_url, [ 'timeout' => 8 ] );
 
         if ( is_wp_error( $me_res ) ) {
             return $me_res;

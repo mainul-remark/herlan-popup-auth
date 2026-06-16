@@ -88,7 +88,9 @@ class Auth_Popup_Admin_Settings {
         if ( '' !== $digits && $digits !== $term ) {
             $digit_like  = '%' . $wpdb->esc_like( $digits ) . '%';
             $phone_where .= $wpdb->prepare(
-                ' OR REPLACE(REPLACE(REPLACE(REPLACE(ap_phone_profile.phone, "+", ""), " ", ""), "-", ""), ".", "") LIKE %s
+                // ap_phone_profile.phone is always stored digits-only (Auth_Popup_SMS_Service::normalise_phone),
+                // so it can be matched directly without the REPLACE() stripping needed for raw usermeta values.
+                ' OR ap_phone_profile.phone LIKE %s
                   OR REPLACE(REPLACE(REPLACE(REPLACE(ap_billing_phone.meta_value, "+", ""), " ", ""), "-", ""), ".", "") LIKE %s',
                 $digit_like,
                 $digit_like
