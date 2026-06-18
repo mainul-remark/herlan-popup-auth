@@ -193,7 +193,7 @@ class Auth_Popup_Admin_Settings {
         }
         wp_enqueue_style(
             'auth-popup-admin',
-            AUTH_POPUP_URL . 'assets/css/admin.css',
+            AUTH_POPUP_URL . 'assets/css/admin' . Auth_Popup_Core::asset_suffix() . '.css',
             [],
             AUTH_POPUP_VERSION
         );

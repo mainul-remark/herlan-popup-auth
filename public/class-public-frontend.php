@@ -51,12 +51,13 @@ class Auth_Popup_Public_Frontend {
     }
 
     public static function enqueue_assets(): void {
-        $s = get_option( 'auth_popup_settings', Auth_Popup_Core::default_settings() );
+        $s      = get_option( 'auth_popup_settings', Auth_Popup_Core::default_settings() );
+        $suffix = Auth_Popup_Core::asset_suffix();
 
         // Main stylesheet
         wp_enqueue_style(
             'auth-popup',
-            AUTH_POPUP_URL . 'assets/css/auth-popup.css',
+            AUTH_POPUP_URL . "assets/css/auth-popup{$suffix}.css",
             [],
             AUTH_POPUP_VERSION
         );
@@ -84,7 +85,7 @@ class Auth_Popup_Public_Frontend {
         // Main JS
         wp_enqueue_script(
             'auth-popup',
-            AUTH_POPUP_URL . 'assets/js/auth-popup.js',
+            AUTH_POPUP_URL . "assets/js/auth-popup{$suffix}.js",
             $auth_popup_deps,
             AUTH_POPUP_VERSION,
             true
@@ -94,14 +95,14 @@ class Auth_Popup_Public_Frontend {
         if ( is_user_logged_in() ) {
             wp_enqueue_style(
                 'auth-address-manager',
-                AUTH_POPUP_URL . 'assets/css/address-manager.css',
+                AUTH_POPUP_URL . "assets/css/address-manager{$suffix}.css",
                 [ 'auth-popup' ],
                 AUTH_POPUP_VERSION
             );
 
             wp_enqueue_script(
                 'auth-address-manager',
-                AUTH_POPUP_URL . 'assets/js/address-manager.js',
+                AUTH_POPUP_URL . "assets/js/address-manager{$suffix}.js",
                 [ 'jquery', 'auth-popup' ],
                 AUTH_POPUP_VERSION,
                 true

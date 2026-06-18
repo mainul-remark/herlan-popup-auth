@@ -15,6 +15,14 @@ class Auth_Popup_Core {
         return self::$instance;
     }
 
+    /**
+     * Returns '.min' for production asset URLs, or '' to load the
+     * unminified source when SCRIPT_DEBUG is on (standard WP convention).
+     */
+    public static function asset_suffix(): string {
+        return ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
+    }
+
     public function run(): void {
         $this->load_textdomain();
 
