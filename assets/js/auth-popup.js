@@ -13,6 +13,7 @@
         $dialog:   null,
         $alert:    null,
         otpTimers: {},   // { formKey: intervalId }
+        _acctSubmitPending: false,
 
         /* ── Init ──────────────────────────────────────────────────── */
         init() {
@@ -1804,7 +1805,60 @@
                 $saveRow.prepend('<button type="button" class="ap-account-details-cancel">Cancel</button>');
             }
 
+            this.bindAccountDetailsSubmit($form);
+
             return true;
+        },
+
+        // Submits the account-details form into a hidden same-origin iframe so
+        // WooCommerce's own redirect-on-success (class-wc-form-handler.php)
+        // happens inside the iframe instead of navigating the whole page away
+        // from wherever the modal was opened.
+        ensureAccountSubmitFrame() {
+            let $frame = $('#ap-account-submit-frame');
+            if ($frame.length) return $frame;
+
+            $frame = $('<iframe name="ap-account-submit-frame" id="ap-account-submit-frame" style="display:none"></iframe>').appendTo('body');
+
+            $frame.on('load', () => {
+                if (!this._acctSubmitPending) return;
+                this._acctSubmitPending = false;
+
+                const $form = $('#ap-acct-modal-body').find('form.ap-account-details-form');
+                $form.find('button[name="save_account_details"]').prop('disabled', false);
+
+                let doc = null;
+                try {
+                    doc = $frame[0].contentDocument || $frame[0].contentWindow.document;
+                } catch (e) {
+                    doc = null;
+                }
+                if (!doc) return;
+
+                if (doc.querySelector('.woocommerce-message')) {
+                    $('#ap-acct-modal').removeClass('open');
+                    $('body').removeClass('ap-no-scroll');
+                    return;
+                }
+
+                const newContent = doc.querySelector('.woocommerce-MyAccount-content');
+                if (newContent) {
+                    this.removeAccountBreadcrumbs(newContent);
+                    $('#ap-acct-modal-body').html(newContent.innerHTML);
+                    this.enhanceMobileAccountContent(window.location.href, 'My Account');
+                }
+            });
+
+            return $frame;
+        },
+
+        bindAccountDetailsSubmit($form) {
+            this.ensureAccountSubmitFrame();
+            $form.attr('target', 'ap-account-submit-frame');
+            $form.off('submit.apAccount').on('submit.apAccount', () => {
+                this._acctSubmitPending = true;
+                $form.find('button[name="save_account_details"]').prop('disabled', true);
+            });
         },
 
         initDatepicker() {
