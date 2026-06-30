@@ -34,17 +34,19 @@
    - [Forgot Password](#614-forgot-password)
    - [Verify Reset OTP](#615-verify-reset-otp)
    - [Reset Password](#616-reset-password)
-7. [Address Endpoints](#7-address-endpoints)
-   - [List Addresses](#71-list-addresses)
-   - [Create Address](#72-create-address)
-   - [Get Address](#73-get-address)
-   - [Update Address](#74-update-address)
-   - [Delete Address](#75-delete-address)
-   - [Set Default Address](#76-set-default-address)
-8. [Admin Settings](#8-admin-settings)
-   - [Get Settings](#81-get-settings)
-9. [Flow Diagrams](#9-flow-diagrams)
-10. [Bangladesh District Codes](#10-bangladesh-district-codes)
+7. [Loyalty Endpoints](#7-loyalty-endpoints)
+   - [Loyalty Summary](#71-loyalty-summary)
+8. [Address Endpoints](#8-address-endpoints)
+   - [List Addresses](#81-list-addresses)
+   - [Create Address](#82-create-address)
+   - [Get Address](#83-get-address)
+   - [Update Address](#84-update-address)
+   - [Delete Address](#85-delete-address)
+   - [Set Default Address](#86-set-default-address)
+9. [Admin Settings](#9-admin-settings)
+   - [Get Settings](#91-get-settings)
+10. [Flow Diagrams](#10-flow-diagrams)
+11. [Bangladesh District Codes](#11-bangladesh-district-codes)
 
 ---
 
@@ -55,6 +57,7 @@ All endpoints live under `/wp-json/auth-popup/v1/`.
 | Group | Path prefix | API Key | Bearer Token | Admin |
 |-------|-------------|---------|--------------|-------|
 | Authentication | `/auth/` | Required | Not required | No |
+| Loyalty | `/loyalty/` | Required | Not required | No |
 | Address book | `/addresses/` | Required | Required | No |
 | Admin Settings | `/settings` | Required | Not required | **Yes** |
 
@@ -432,6 +435,8 @@ Content-Type: application/json
     "token": "a3f9c2d1e8b74a6f0c5d2e1f9b8a7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0",
     "refresh_token": "c5f9b2d4e7a0b3c6d9e2f5b8a1c4d7e0f3b6a9c2d5e8f1b4a7c0d3e6f9b2a5c8",
     "expires_in": 43200,
+    "loyalty_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "loyalty_device_id": "dev_8a3f2c1d9e4b7a0f",
     "redirect": "https://your-domain.com",
     "user": {
       "id": 42,
@@ -450,6 +455,7 @@ Content-Type: application/json
 ```
 
 > **Save `token`** immediately. Use it in the `Authorization: Bearer` header for all address requests.  
+> **`loyalty_token` and `loyalty_device_id`** are present only when the user is enrolled in the Herlan Star Loyalty Programme. Pass them to [`GET /loyalty/summary`](#71-loyalty-summary) to fetch the customer's balance and level.  
 > See [§5 User Object](#5-user-object) for a full description of the `user` fields.
 
 #### Errors
@@ -1308,6 +1314,102 @@ Content-Type: application/json
   "message": "Passwords do not match.",
   "data": {}
 }
+```
+
+---
+
+## 7. Loyalty Endpoints
+
+These endpoints interact with the Herlan Star Loyalty Programme API. `loyalty_token` and `loyalty_device_id` are obtained from any login or registration response when the user is an enrolled loyalty member.
+
+---
+
+### 7.1 Loyalty Summary
+
+Fetch the authenticated loyalty customer's account snapshot — current balance, tier level, and transaction history. Call this **after** login, using the credentials returned in the login response.
+
+```
+GET /loyalty/summary
+```
+
+#### Query parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `loyalty_token` | string | Yes | Bearer access token from the login response |
+| `loyalty_device_id` | string | No | Device ID from the login response |
+
+#### Success `200`
+
+```json
+{
+  "success": true,
+  "response_code": 200,
+  "message": "Loyalty summary retrieved.",
+  "data": {
+    "summary": [
+      {
+        "balance": 1250,
+        "level": { "name": "Silver", "meta": "Earn 2x points this month" },
+        "total_spent": 15000,
+        "collected_points": 1250
+      }
+    ]
+  }
+}
+```
+
+> The shape of each `summary` entry is defined by the loyalty server. Fields may vary based on customer tier and programme configuration.
+
+#### Errors
+
+```json
+// 401 — loyalty_token expired or invalid
+{
+  "success": false,
+  "response_code": 401,
+  "message": "Loyalty session expired. Please log in again.",
+  "data": {}
+}
+```
+
+```json
+// 404 — no summary data available for this customer
+{
+  "success": false,
+  "response_code": 404,
+  "message": "No loyalty summary available.",
+  "data": {}
+}
+```
+
+```json
+// 502 — loyalty service unreachable
+{
+  "success": false,
+  "response_code": 502,
+  "message": "Failed to reach loyalty service.",
+  "data": {}
+}
+```
+
+```json
+// 503 — loyalty programme not configured in WP Admin
+{
+  "success": false,
+  "response_code": 503,
+  "message": "Loyalty programme is not configured.",
+  "data": {}
+}
+```
+
+#### Recommended usage
+
+```
+1. POST /auth/login  →  save loyalty_token + loyalty_device_id
+2. (async, after page load)
+   GET /loyalty/summary?loyalty_token=...&loyalty_device_id=...
+   →  render balance / tier widget
 ```
 
 ---

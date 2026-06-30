@@ -622,8 +622,10 @@ class Auth_Popup_Core {
             'fb_app_id'             => '',
             'fb_app_secret'         => '',
             // Loyalty
-            'loyalty_enabled'       => '1',
-            'loyalty_api_url'       => '',
+            'loyalty_enabled'         => '1',
+            'loyalty_api_url'         => '',
+            'loyalty_channel_key_id'  => '',
+            'loyalty_channel_secret'  => '',
             // General
             'redirect_url'          => home_url(),
             'trigger_selector'      => '.auth-popup-trigger',

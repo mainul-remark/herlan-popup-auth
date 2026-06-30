@@ -128,10 +128,10 @@ class Auth_Popup_Ajax_Handler {
         // Successful login: clear failure counters for this IP and credential
         self::clear_password_failures( $credential );
 
-        self::success( [
+        self::success( array_merge( [
             'message'  => __( 'Login successful!', 'auth-popup' ),
             'redirect' => self::redirect_url(),
-        ] );
+        ], self::try_loyalty_login( $user ) ) );
     }
 
     /* ── Login with OTP ─────────────────────────────────────────────── */
@@ -165,10 +165,10 @@ class Auth_Popup_Ajax_Handler {
             self::error( $user->get_error_message() );
         }
 
-        self::success( [
+        self::success( array_merge( [
             'message'  => __( 'Login successful!', 'auth-popup' ),
             'redirect' => self::redirect_url(),
-        ] );
+        ], self::try_loyalty_login( $user ) ) );
     }
 
     /* ── Register ───────────────────────────────────────────────────── */
@@ -234,10 +234,96 @@ class Auth_Popup_Ajax_Handler {
      * Register user in the Herlan Loyalty Programme via direct API call.
      * Returns a short status string to append to the success message.
      */
+    /**
+     * Attempt loyalty API login for an already-authenticated WP user.
+     * Returns loyalty token data to include in the login response, or an
+     * empty array on any error — WordPress login is NEVER affected.
+     */
+    private static function try_loyalty_login( \WP_User $user ): array {
+        $api_url = rtrim( (string) Auth_Popup_Core::get_setting( 'loyalty_api_url' ), '/' );
+        $key_id  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_key_id', '' );
+        $secret  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_secret', '' );
+
+        if ( empty( $api_url ) || empty( $key_id ) || empty( $secret ) ) {
+            return [];
+        }
+
+        $phone = Auth_Popup_User_Auth::get_user_phone( $user->ID );
+        if ( empty( $phone ) ) {
+            return [];
+        }
+
+        try {
+            $login_url  = $api_url . '/login';
+            $login_body = wp_json_encode( [ 'phone' => $phone ] );
+
+            $response = wp_remote_post( $login_url, [
+                'timeout' => 4,
+                'headers' => self::loyalty_auth_headers( 'POST', $login_url, $login_body ),
+                'body'    => $login_body,
+            ] );
+
+            if ( is_wp_error( $response ) ) {
+                return [];
+            }
+
+            $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+            if ( ! empty( $data['data']['access_token'] ) ) {
+                return [
+                    'loyalty_token'     => $data['data']['access_token'],
+                    'loyalty_device_id' => $data['data']['device_id'] ?? '',
+                ];
+            }
+        } catch ( \Throwable $e ) {
+            // Silently fail — loyalty errors must never break WordPress login
+        }
+
+        return [];
+    }
+
+    /**
+     * Build HMAC-signed headers for every Loyalty API request.
+     *
+     * Canonical string (newline-joined):
+     *   METHOD, URL path+query, Unix timestamp, nonce, SHA-256(raw body)
+     * Signed with HMAC-SHA256 using channel_secret.
+     */
+    private static function loyalty_auth_headers( string $method, string $url, string $raw_body ): array {
+        $key_id  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_key_id', '' );
+        $secret  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_secret', '' );
+
+        $parsed    = wp_parse_url( $url );
+        $path      = $parsed['path'] ?? '/';
+        if ( ! empty( $parsed['query'] ) ) {
+            $path .= '?' . $parsed['query'];
+        }
+
+        $ts        = (string) time();
+        $nb        = random_bytes( 16 );
+        $nb[6]     = chr( ( ord( $nb[6] ) & 0x0f ) | 0x40 );
+        $nb[8]     = chr( ( ord( $nb[8] ) & 0x3f ) | 0x80 );
+        $nonce     = vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $nb ), 4 ) );
+        $body_hash = hash( 'sha256', $raw_body );
+        $canonical = implode( "\n", [ strtoupper( $method ), $path, $ts, $nonce, $body_hash ] );
+        $signature = hash_hmac( 'sha256', $canonical, $secret );
+
+        return [
+            'Accept'        => 'application/json',
+            'Content-Type'  => 'application/json',
+            'X-Channel-Key' => $key_id,
+            'X-Timestamp'   => $ts,
+            'X-Nonce'       => $nonce,
+            'X-Signature'   => $signature,
+        ];
+    }
+
     private static function register_loyalty( \WP_User $user, string $name, string $email, string $phone ): string {
         $api_url = rtrim( (string) Auth_Popup_Core::get_setting( 'loyalty_api_url' ), '/' );
+        $key_id  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_key_id', '' );
+        $secret  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_secret', '' );
 
-        if ( empty( $api_url ) ) {
+        if ( empty( $api_url ) || empty( $key_id ) || empty( $secret ) ) {
             return '';
         }
 
@@ -249,7 +335,30 @@ class Auth_Popup_Ajax_Handler {
             return __( '(Loyalty registration skipped: gender and date of birth are required.)', 'auth-popup' );
         }
 
-        $data = [
+        // Step 1: check if phone already exists in loyalty system
+        $login_url  = $api_url . '/login';
+        $login_body = wp_json_encode( [ 'phone' => $phone ] );
+
+        $login_res = wp_remote_post( $login_url, [
+            'timeout' => 6,
+            'headers' => self::loyalty_auth_headers( 'POST', $login_url, $login_body ),
+            'body'    => $login_body,
+        ] );
+
+        if ( is_wp_error( $login_res ) ) {
+            return '';
+        }
+
+        $login_data = json_decode( wp_remote_retrieve_body( $login_res ), true );
+        if ( ! empty( $login_data['data']['access_token'] ) ) {
+            // Phone already registered in loyalty system
+            update_user_meta( $user->ID, 'herlan_loyalty_registered', '1' );
+            return __( 'You are already a loyal member!', 'auth-popup' );
+        }
+
+        // Step 2: phone not found — register in loyalty system
+        $reg_url  = $api_url . '/registration';
+        $reg_body = wp_json_encode( [
             'full_name'   => $name,
             'email'       => $email,
             'phone'       => $phone,
@@ -258,39 +367,13 @@ class Auth_Popup_Ajax_Handler {
             'dob'         => $dob,
             'channel'     => 'E-commerce',
             'join_date'   => date( 'Y-m-d' ),
-        ];
+        ] );
 
-        // Step 1: check if phone already exists in loyalty system
-        $login_res = wp_remote_post(
-            $api_url . '/login',
-            [
-                'timeout' => 6,
-                'headers' => [ 'Content-Type' => 'application/json' ],
-                'body'    => wp_json_encode( [ 'phone' => $phone ] ),
-            ]
-        );
-
-        if ( is_wp_error( $login_res ) ) {
-            // Loyalty API unreachable — skip the second call rather than waiting out another timeout.
-            return '';
-        }
-
-        $login_body = json_decode( wp_remote_retrieve_body( $login_res ), true );
-        if ( ! empty( $login_body['success'] ) ) {
-            // Phone already registered in loyalty system
-            update_user_meta( $user->ID, 'herlan_loyalty_registered', '1' );
-            return __( 'You are already a loyal member!', 'auth-popup' );
-        }
-
-        // Step 2: phone not found — register in loyalty system
-        $response = wp_remote_post(
-            $api_url . '/registration',
-            [
-                'timeout'     => 6,
-                'headers'     => [ 'Content-Type' => 'application/json' ],
-                'body'        => wp_json_encode( $data ),
-            ]
-        );
+        $response = wp_remote_post( $reg_url, [
+            'timeout' => 6,
+            'headers' => self::loyalty_auth_headers( 'POST', $reg_url, $reg_body ),
+            'body'    => $reg_body,
+        ] );
 
         if ( is_wp_error( $response ) ) {
             return '';
@@ -339,10 +422,10 @@ class Auth_Popup_Ajax_Handler {
                     if ( is_wp_error( $user ) ) {
                         self::error( $user->get_error_message() );
                     }
-                    self::success( [
+                    self::success( array_merge( [
                         'message'  => __( 'Logged in with Google!', 'auth-popup' ),
                         'redirect' => self::redirect_url(),
-                    ] );
+                    ], self::try_loyalty_login( $user ) ) );
                 }
                 // User exists but has no phone — fall through to require phone
             }
@@ -390,10 +473,10 @@ class Auth_Popup_Ajax_Handler {
                     if ( is_wp_error( $user ) ) {
                         self::error( $user->get_error_message() );
                     }
-                    self::success( [
+                    self::success( array_merge( [
                         'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
                         'redirect' => self::redirect_url(),
-                    ] );
+                    ], self::try_loyalty_login( $user ) ) );
                 }
                 // User exists but has no phone — fall through to require phone
             }
@@ -498,10 +581,10 @@ class Auth_Popup_Ajax_Handler {
             $message .= ' ' . $loyalty_message;
         }
 
-        self::success( [
+        self::success( array_merge( [
             'message'  => $message,
             'redirect' => self::redirect_url(),
-        ] );
+        ], self::try_loyalty_login( $user ) ) );
     }
 
     /* ── Logout ─────────────────────────────────────────────────────── */
@@ -523,9 +606,11 @@ class Auth_Popup_Ajax_Handler {
             self::success( $cached );
         }
 
-        $response = wp_remote_get( 'https://loyalty.herlan.store/api/customer/loyalty/rules', [
+        $rules_url = 'https://loyalty.herlan.store/api/customer/loyalty/rules';
+
+        $response = wp_remote_get( $rules_url, [
             'timeout' => 10,
-            'headers' => [ 'Accept' => 'application/json' ],
+            'headers' => self::loyalty_auth_headers( 'GET', $rules_url, '' ),
         ] );
 
         if ( is_wp_error( $response ) ) {

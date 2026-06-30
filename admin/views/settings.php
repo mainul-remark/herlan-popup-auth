@@ -250,6 +250,20 @@
                             <p class="description"><?php esc_html_e( 'The base URL of the Herlan Loyalty API. Registration data will be POSTed to {Base URL}/registration.', 'auth-popup' ); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Channel Key ID', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="text" name="auth_popup_settings[loyalty_channel_key_id]" value="<?php echo esc_attr( $s['loyalty_channel_key_id'] ?? '' ); ?>" class="large-text">
+                            <p class="description"><?php esc_html_e( 'Your channel_key_id — sent as the X-Channel-Key header value on every request.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Channel Secret', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="password" name="auth_popup_settings[loyalty_channel_secret]" value="<?php echo esc_attr( $s['loyalty_channel_secret'] ?? '' ); ?>" class="large-text" autocomplete="new-password">
+                            <p class="description"><?php esc_html_e( 'Your channel_secret — used to generate the HMAC-SHA256 X-Signature header. Never shared publicly.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
                 </table>
             </div>
 
