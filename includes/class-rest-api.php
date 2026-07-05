@@ -294,6 +294,8 @@ class Auth_Popup_REST_API {
         ] );
 
         // ── Admin Settings endpoint ─────────────────────────────────────
+        // Invoice download moved to herlan-rest-api: GET herlan/v1/orders/{id}/invoice
+
         register_rest_route( $ns, '/settings', [
             'methods'             => WP_REST_Server::READABLE,
             'callback'            => [ __CLASS__, 'get_settings' ],
