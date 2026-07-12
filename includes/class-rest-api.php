@@ -1324,12 +1324,13 @@ class Auth_Popup_REST_API {
         $signature = hash_hmac( 'sha256', $canonical, $secret );
 
         return [
-            'Accept'        => 'application/json',
-            'Content-Type'  => 'application/json',
-            'X-Channel-Key' => $key_id,
-            'X-Timestamp'   => $ts,
-            'X-Nonce'       => $nonce,
-            'X-Signature'   => $signature,
+            'Accept'           => 'application/json',
+            'Content-Type'     => 'application/json',
+            'X-Channel-Key'    => $key_id,
+            'X-Channel-Secret' => $secret,
+            'X-Timestamp'      => $ts,
+            'X-Nonce'          => $nonce,
+            'X-Signature'      => $signature,
         ];
     }
 
@@ -1346,6 +1347,7 @@ class Auth_Popup_REST_API {
         if ( empty( $phone ) ) {
             return [];
         }
+        $phone = self::loyalty_phone( $phone );
 
         try {
             $login_url  = $api_url . '/login';
@@ -1382,6 +1384,7 @@ class Auth_Popup_REST_API {
         $api_url = rtrim( (string) Auth_Popup_Core::get_setting( 'loyalty_api_url' ), '/' );
         $key_id  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_key_id', '' );
         $secret  = (string) Auth_Popup_Core::get_setting( 'loyalty_channel_secret', '' );
+        $phone = self::loyalty_phone( $phone );
 
         if ( empty( $api_url ) || empty( $key_id ) || empty( $secret ) ) {
             return '';
@@ -1532,5 +1535,13 @@ class Auth_Popup_REST_API {
             'country'    => [ 'required' => false,     'type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'BD' ],
             'phone'      => [ 'required' => $required, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
         ];
+    }
+
+    private static function loyalty_phone( string $phone ): string {
+        $digits = preg_replace( '/\D/', '', $phone );
+        if ( strpos( $digits, '880' ) === 0 ) {
+            $digits = substr( $digits, 3 );
+        }
+        return '0' . $digits;
     }
 }

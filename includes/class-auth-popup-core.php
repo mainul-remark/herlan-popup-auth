@@ -626,6 +626,7 @@ class Auth_Popup_Core {
             'loyalty_api_url'         => '',
             'loyalty_channel_key_id'  => '',
             'loyalty_channel_secret'  => '',
+            'loyalty_channel'         => 'Ecommerce',
             // General
             'redirect_url'          => home_url(),
             'trigger_selector'      => '.auth-popup-trigger',

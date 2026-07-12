@@ -255,7 +255,7 @@ class Auth_Popup_Ajax_Handler {
 
         try {
             $login_url  = $api_url . '/login';
-            $login_body = wp_json_encode( [ 'phone' => $phone ] );
+            $login_body = wp_json_encode( [ 'phone' => self::to_loyalty_phone( $phone ) ] );
 
             $response = wp_remote_post( $login_url, [
                 'timeout' => 4,
@@ -264,6 +264,7 @@ class Auth_Popup_Ajax_Handler {
             ] );
 
             if ( is_wp_error( $response ) ) {
+                self::log_loyalty_error( 'login', $response->get_error_message() );
                 return [];
             }
 
@@ -276,10 +277,34 @@ class Auth_Popup_Ajax_Handler {
                 ];
             }
         } catch ( \Throwable $e ) {
+            self::log_loyalty_error( 'login', $e->getMessage() );
             // Silently fail — loyalty errors must never break WordPress login
         }
 
         return [];
+    }
+
+    /**
+     * Convert the plugin's internal phone format (880XXXXXXXXXX, used for
+     * WP user storage and SMS OTP) to the local BD format (01XXXXXXXXX)
+     * that the Herlan Loyalty API requires.
+     */
+    private static function to_loyalty_phone( string $phone ): string {
+        $clean = preg_replace( '/\D/', '', $phone );
+        if ( strpos( $clean, '880' ) === 0 ) {
+            $clean = substr( $clean, 3 );
+        }
+        return '0' . ltrim( $clean, '0' );
+    }
+
+    /**
+     * Write Loyalty API failures to the WP debug log (only when WP_DEBUG
+     * is on) so failures are diagnosable without exposing them to users.
+     */
+    private static function log_loyalty_error( string $context, string $detail ): void {
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            error_log( sprintf( '[auth-popup][loyalty:%s] %s', $context, $detail ) );
+        }
     }
 
     /**
@@ -330,14 +355,17 @@ class Auth_Popup_Ajax_Handler {
         $gender      = sanitize_text_field( $_POST['gender']      ?? '' );
         $dob         = sanitize_text_field( $_POST['dob']         ?? '' );
         $card_number = sanitize_text_field( $_POST['card_number'] ?? '' );
+        $channel     = (string) Auth_Popup_Core::get_setting( 'loyalty_channel', 'Ecommerce' );
 
-        if ( empty( $gender ) || empty( $dob ) ) {
-            return __( '(Loyalty registration skipped: gender and date of birth are required.)', 'auth-popup' );
+        if ( empty( $name ) || empty( $gender ) || empty( $dob ) ) {
+            return __( '(Loyalty registration skipped: name, gender and date of birth are required.)', 'auth-popup' );
         }
+
+        $loyalty_phone = self::to_loyalty_phone( $phone );
 
         // Step 1: check if phone already exists in loyalty system
         $login_url  = $api_url . '/login';
-        $login_body = wp_json_encode( [ 'phone' => $phone ] );
+        $login_body = wp_json_encode( [ 'phone' => $loyalty_phone ] );
 
         $login_res = wp_remote_post( $login_url, [
             'timeout' => 6,
@@ -346,6 +374,7 @@ class Auth_Popup_Ajax_Handler {
         ] );
 
         if ( is_wp_error( $login_res ) ) {
+            self::log_loyalty_error( 'login', $login_res->get_error_message() );
             return '';
         }
 
@@ -361,11 +390,11 @@ class Auth_Popup_Ajax_Handler {
         $reg_body = wp_json_encode( [
             'full_name'   => $name,
             'email'       => $email,
-            'phone'       => $phone,
+            'phone'       => $loyalty_phone,
             'card_number' => $card_number,
             'gender'      => strtolower( $gender ),
             'dob'         => $dob,
-            'channel'     => 'E-commerce',
+            'channel'     => $channel,
             'join_date'   => date( 'Y-m-d' ),
         ] );
 
@@ -376,6 +405,7 @@ class Auth_Popup_Ajax_Handler {
         ] );
 
         if ( is_wp_error( $response ) ) {
+            self::log_loyalty_error( 'registration', $response->get_error_message() );
             return '';
         }
 
@@ -386,8 +416,37 @@ class Auth_Popup_Ajax_Handler {
             return __( 'You have joined the Herlan Star Loyalty Programme!', 'auth-popup' );
         }
 
-        $err_msg = $body['message'] ?? __( 'Loyalty registration failed.', 'auth-popup' );
-        return '(' . $err_msg . ')';
+        $error_text = self::format_loyalty_error( $body );
+        self::log_loyalty_error( 'registration', $error_text . ' | raw: ' . wp_remote_retrieve_body( $response ) );
+
+        return '(' . $error_text . ')';
+    }
+
+    /**
+     * Extract a human-readable error from a Herlan Loyalty API response.
+     * Field-level messages live under `data` (e.g. {"phone":["This phone
+     * number is already registered."]}) — the top-level `message` alone
+     * (e.g. "Validation failed") is not specific enough to act on.
+     */
+    private static function format_loyalty_error( ?array $body ): string {
+        $base = $body['message'] ?? __( 'Loyalty registration failed.', 'auth-popup' );
+
+        $field_errors = [];
+        if ( ! empty( $body['data'] ) && is_array( $body['data'] ) ) {
+            foreach ( $body['data'] as $messages ) {
+                foreach ( (array) $messages as $msg ) {
+                    if ( is_string( $msg ) ) {
+                        $field_errors[] = $msg;
+                    }
+                }
+            }
+        }
+
+        if ( ! empty( $field_errors ) ) {
+            return implode( ' ', $field_errors );
+        }
+
+        return $base;
     }
 
     /* ── Google Auth ────────────────────────────────────────────────── */

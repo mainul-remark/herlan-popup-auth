@@ -178,6 +178,9 @@ class Auth_Popup_Admin_Settings {
                 case 'loyalty_channel_secret':
                     $clean[ $key ] = sanitize_text_field( $value );
                     break;
+                case 'loyalty_channel':
+                    $clean[ $key ] = sanitize_text_field( $value );
+                    break;
                 case 'rest_api_key':
                     // Preserve existing key if the submitted value is empty (read-only field)
                     $existing      = Auth_Popup_Core::get_setting( 'rest_api_key', '' );
@@ -214,6 +217,37 @@ class Auth_Popup_Admin_Settings {
             return;
         }
         require AUTH_POPUP_PATH . 'admin/views/settings.php';
+    }
+
+    /**
+     * Tail wp-content/debug.log and return the most recent lines matching
+     * "[auth-popup]" (newest first). Reads only the last $tail_bytes of
+     * the file so this stays fast even on very large debug logs.
+     */
+    public static function get_recent_debug_log_lines( int $max_lines = 200, int $tail_bytes = 2097152 ): array {
+        $log_path = WP_CONTENT_DIR . '/debug.log';
+
+        if ( ! is_readable( $log_path ) ) {
+            return [];
+        }
+
+        $size = filesize( $log_path );
+        $fh   = fopen( $log_path, 'rb' );
+        if ( ! $fh ) {
+            return [];
+        }
+
+        $start = max( 0, $size - $tail_bytes );
+        fseek( $fh, $start );
+        $chunk = fread( $fh, $size - $start );
+        fclose( $fh );
+
+        $lines   = preg_split( '/\r\n|\r|\n/', (string) $chunk );
+        $matched = array_values( array_filter( $lines, static function ( $line ) {
+            return false !== stripos( $line, '[auth-popup]' );
+        } ) );
+
+        return array_slice( array_reverse( $matched ), 0, $max_lines );
     }
 
     public static function plugin_action_links( array $links ): array {

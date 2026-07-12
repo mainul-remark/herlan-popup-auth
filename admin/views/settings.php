@@ -18,6 +18,7 @@
                 <a href="#tab-loyalty"   class="nav-tab"                data-tab="tab-loyalty"><?php esc_html_e( 'Loyalty', 'auth-popup' ); ?></a>
                 <a href="#tab-checkout"  class="nav-tab"                data-tab="tab-checkout"><?php esc_html_e( 'Checkout', 'auth-popup' ); ?></a>
                 <a href="#tab-migration" class="nav-tab"                data-tab="tab-migration"><?php esc_html_e( 'Migration', 'auth-popup' ); ?></a>
+                <a href="#tab-logs"      class="nav-tab"                data-tab="tab-logs"><?php esc_html_e( 'Logs', 'auth-popup' ); ?></a>
             </nav>
 
             <!-- SMS / OTP -->
@@ -264,6 +265,13 @@
                             <p class="description"><?php esc_html_e( 'Your channel_secret — used to generate the HMAC-SHA256 X-Signature header. Never shared publicly.', 'auth-popup' ); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Channel Value', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="text" name="auth_popup_settings[loyalty_channel]" value="<?php echo esc_attr( $s['loyalty_channel'] ?? 'Ecommerce' ); ?>" class="regular-text">
+                            <p class="description"><?php esc_html_e( 'The "channel" value sent in the registration body — must exactly match the value configured on the Herlan Loyalty side (e.g. "Ecommerce").', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
                 </table>
             </div>
 
@@ -346,6 +354,30 @@
                     <span id="ap-udm-msg" style="margin-left:10px;color:#2271b1;font-size:13px;"></span>
                 </div>
 
+            </div>
+
+            <!-- Logs -->
+            <div id="tab-logs" class="auth-popup-tab-content">
+                <h2><?php esc_html_e( 'Recent Auth Popup Log Entries', 'auth-popup' ); ?></h2>
+                <p class="description">
+                    <?php
+                    printf(
+                        /* translators: %s: path to the debug.log file */
+                        esc_html__( 'Shows the most recent entries tagged [auth-popup] from %s (e.g. Loyalty API failures). Requires WP_DEBUG_LOG to stay enabled.', 'auth-popup' ),
+                        '<code>' . esc_html( str_replace( ABSPATH, '', WP_CONTENT_DIR . '/debug.log' ) ) . '</code>'
+                    );
+                    ?>
+                </p>
+                <?php $ap_log_lines = Auth_Popup_Admin_Settings::get_recent_debug_log_lines(); ?>
+                <?php if ( empty( $ap_log_lines ) ) : ?>
+                    <p><em><?php esc_html_e( 'No matching log entries found yet.', 'auth-popup' ); ?></em></p>
+                <?php else : ?>
+                    <pre style="max-height:520px;overflow:auto;background:#1e1e1e;color:#d4d4d4;padding:14px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;border-radius:4px;"><?php
+                        foreach ( $ap_log_lines as $ap_log_line ) {
+                            echo esc_html( $ap_log_line ) . "\n";
+                        }
+                    ?></pre>
+                <?php endif; ?>
             </div>
 
         </div>
