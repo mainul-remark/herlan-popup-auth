@@ -496,10 +496,15 @@
         },
 
         bindPasswordToggle() {
+            const eyeSVG    = '<svg class="ap-eye" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/></svg>';
+            const eyeOffSVG = '<svg class="ap-eye" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" stroke-width="1.8"/></svg>';
+
             this.$ctx.on('click', '.ap-toggle-pass', function () {
-                const $input = $(this).siblings('input');
-                const type   = $input.attr('type') === 'password' ? 'text' : 'password';
-                $input.attr('type', type);
+                const $btn        = $(this);
+                const $input      = $btn.siblings('input');
+                const isPassword  = $input.attr('type') === 'password';
+                $input.attr('type', isPassword ? 'text' : 'password');
+                $btn.html(isPassword ? eyeOffSVG : eyeSVG);
             });
         },
 
