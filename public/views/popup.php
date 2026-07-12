@@ -288,7 +288,8 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                             <div class="ap-loyalty-rules-wrap">
                                 <h3 class="ap-loyalty-rules-title"><?php esc_html_e( 'Herlan Star Member Rules', 'auth-popup' ); ?></h3>
                                 <div class="ap-loyalty-table-scroll">
-                                    <table id="auth-loyal-rules-table" class="ap-loyal-rules-table">
+                                    <img src="<?php echo esc_url( AUTH_POPUP_URL . 'assets/static-rules.jpeg') ?>" alt="loyalty-rules">
+                                    <table id="auth-loyal-rules-table" class="ap-loyal-rules-table" style="display: none!important;">
                                         <thead>
                                             <tr>
                                                 <th class="ap-col-num">#</th>
@@ -306,12 +307,12 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                                         </tbody>
                                     </table>
                                 </div>
-                                <div id="ap-loyalty-rules-footer" style="display:none;">
-                                    <button type="button" id="ap-loyalty-view-more">
-                                        <?php esc_html_e( 'View More', 'auth-popup' ); ?>
-                                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </button>
-                                </div>
+<!--                                <div id="ap-loyalty-rules-footer" style="display:none;">-->
+<!--                                    <button type="button" id="ap-loyalty-view-more">-->
+<!--                                        --><?php //esc_html_e( 'View More', 'auth-popup' ); ?>
+<!--                                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>-->
+<!--                                    </button>-->
+<!--                                </div>-->
                             </div>
                         </div>
                     </div>

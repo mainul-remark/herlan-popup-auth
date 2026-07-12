@@ -255,7 +255,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                         <div class="ap-loyalty-rules-wrap">
                             <h3 class="ap-loyalty-rules-title"><?php esc_html_e( 'Herlan Star Member Rules', 'auth-popup' ); ?></h3>
                             <div class="ap-loyalty-table-scroll">
-                                <table id="auth-loyal-rules-table" class="ap-loyal-rules-table">
+                                <table id="auth-loyal-rules-table" class="ap-loyal-rules-table" >
                                     <thead>
                                         <tr>
                                             <th class="ap-col-num">#</th>
@@ -498,7 +498,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
                         <div class="ap-loyalty-rules-wrap">
                             <h3 class="ap-loyalty-rules-title"><?php esc_html_e( 'Herlan Star Member Rules', 'auth-popup' ); ?></h3>
                             <div class="ap-loyalty-table-scroll">
-                                <table class="ap-loyal-rules-table">
+                                <table class="ap-loyal-rules-table" >
                                     <thead>
                                         <tr>
                                             <th class="ap-col-num">#</th>
