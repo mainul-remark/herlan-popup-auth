@@ -336,7 +336,23 @@ class Auth_Popup_User_Auth {
         if ( empty( $base ) && $phone ) {
             $base = 'user_' . substr( preg_replace( '/\D/', '', $phone ), -8 );
         }
-        $base    = $base ?: 'user';
+        $base = $base ?: 'user';
+
+        if ( ! username_exists( $base ) ) {
+            return $base;
+        }
+
+        // Base username is taken — disambiguate with the phone number rather than a numeric suffix.
+        if ( $phone ) {
+            $digits     = substr( preg_replace( '/\D/', '', $phone ), -8 );
+            $with_phone = $base . '_' . $digits;
+            if ( ! username_exists( $with_phone ) ) {
+                return $with_phone;
+            }
+            $base = $with_phone;
+        }
+
+        // Last-resort guard in case even the phone-suffixed username collides.
         $username = $base;
         $counter  = 1;
         while ( username_exists( $username ) ) {
