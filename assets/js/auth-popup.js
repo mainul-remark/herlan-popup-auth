@@ -860,9 +860,14 @@
             // Small delay so WooCommerce checkout scripts finish first
             setTimeout(() => this.open(), 400);
 
-            // "Continue as Guest" closes popup and lets WooCommerce proceed normally
+            // "Continue as Guest" closes the login popup and lets WooCommerce
+            // proceed normally. If a guest notice is configured, show it —
+            // it has its own button to reopen this popup for login/register.
             $('#ap-guest-btn').on('click', () => {
                 this.close();
+                if (window.APNotice && typeof window.APNotice.show === 'function') {
+                    window.APNotice.show();
+                }
             });
 
             // Intercept "Returning customer? Click here to login" — open auth popup

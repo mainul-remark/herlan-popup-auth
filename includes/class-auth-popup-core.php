@@ -74,6 +74,7 @@ class Auth_Popup_Core {
         Auth_Popup_REST_API::init();
         Auth_Popup_Admin_Settings::init();
         Auth_Popup_Public_Frontend::init();
+        Auth_Popup_Notice_Manager::init();
     }
 
     private function load_textdomain(): void {
@@ -645,6 +646,11 @@ class Auth_Popup_Core {
             'checkout_disable_ship_to_different'=> '1',
             // My Account inline form
             'myaccount_inline_form'             => '1',
+            // Guest checkout notice (shown when "Continue as Guest" is clicked)
+            'notices_enabled'                   => '1',
+            'notice_title'                      => '',
+            'notice_message'                    => '',
+            'notice_image_url'                  => '',
             // REST API
             'rest_api_key'                      => '',
             'token_lifetime_hours'              => 12,

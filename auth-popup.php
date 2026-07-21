@@ -28,6 +28,7 @@ require_once AUTH_POPUP_PATH . 'includes/class-sms-service.php';
 require_once AUTH_POPUP_PATH . 'includes/class-user-auth.php';
 require_once AUTH_POPUP_PATH . 'includes/class-oauth-handler.php';
 require_once AUTH_POPUP_PATH . 'includes/class-address-manager.php';
+require_once AUTH_POPUP_PATH . 'includes/class-notice-manager.php';
 require_once AUTH_POPUP_PATH . 'includes/class-ajax-handler.php';
 require_once AUTH_POPUP_PATH . 'includes/class-rest-api.php';
 require_once AUTH_POPUP_PATH . 'admin/class-admin-settings.php';

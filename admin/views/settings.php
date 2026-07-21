@@ -15,6 +15,7 @@
                 <a href="#tab-google"    class="nav-tab"                data-tab="tab-google"><?php esc_html_e( 'Google',    'auth-popup' ); ?></a>
                 <a href="#tab-facebook"  class="nav-tab"                data-tab="tab-facebook"><?php esc_html_e( 'Facebook', 'auth-popup' ); ?></a>
                 <a href="#tab-general"   class="nav-tab"                data-tab="tab-general"><?php esc_html_e( 'General',  'auth-popup' ); ?></a>
+                <a href="#tab-notices"   class="nav-tab"                data-tab="tab-notices"><?php esc_html_e( 'Notices', 'auth-popup' ); ?></a>
                 <a href="#tab-loyalty"   class="nav-tab"                data-tab="tab-loyalty"><?php esc_html_e( 'Loyalty', 'auth-popup' ); ?></a>
                 <a href="#tab-checkout"  class="nav-tab"                data-tab="tab-checkout"><?php esc_html_e( 'Checkout', 'auth-popup' ); ?></a>
                 <a href="#tab-migration" class="nav-tab"                data-tab="tab-migration"><?php esc_html_e( 'Migration', 'auth-popup' ); ?></a>
@@ -232,6 +233,48 @@
                 </div>
             </div>
 
+            <!-- Notices -->
+            <div id="tab-notices" class="auth-popup-tab-content">
+                <table class="form-table">
+                    <tr>
+                        <th><?php esc_html_e( 'Enable Guest Checkout Notice', 'auth-popup' ); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="auth_popup_settings[notices_enabled]" value="1" <?php checked( $s['notices_enabled'] ?? '1', '1' ); ?>>
+                                <?php esc_html_e( 'Show this notice when a customer clicks "Continue as Guest" on the checkout popup', 'auth-popup' ); ?>
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Notice Title', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="text" name="auth_popup_settings[notice_title]" value="<?php echo esc_attr( $s['notice_title'] ?? '' ); ?>" class="large-text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Notice Image', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="hidden" name="auth_popup_settings[notice_image_url]" value="<?php echo esc_url( $s['notice_image_url'] ?? '' ); ?>" id="ap-notice-image-url">
+                            <div id="ap-notice-image-preview" style="margin-bottom:10px;">
+                                <img id="ap-notice-image-preview-img" src="<?php echo esc_url( $s['notice_image_url'] ?? '' ); ?>" alt="<?php esc_attr_e( 'Notice image preview', 'auth-popup' ); ?>" style="display:<?php echo ! empty( $s['notice_image_url'] ) ? 'block' : 'none'; ?>; max-width:240px; height:auto; border:1px solid #dcdcde; border-radius:4px; padding:4px;">
+                            </div>
+                            <button type="button" class="button" id="ap-notice-image-picker"><?php esc_html_e( 'Choose Image', 'auth-popup' ); ?></button>
+                            <button type="button" class="button" id="ap-notice-image-remove" style="display:<?php echo ! empty( $s['notice_image_url'] ) ? 'inline-block' : 'none'; ?>;"><?php esc_html_e( 'Remove Image', 'auth-popup' ); ?></button>
+                            <p class="description"><?php esc_html_e( 'Optional. Shown above the title.', 'auth-popup' ); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Notice Message', 'auth-popup' ); ?></th>
+                        <td>
+                            <textarea name="auth_popup_settings[notice_message]" rows="5" class="large-text"><?php echo esc_textarea( $s['notice_message'] ?? '' ); ?></textarea>
+                        </td>
+                    </tr>
+                </table>
+                <p class="description">
+                    <?php esc_html_e( 'This single notice appears when a customer chooses "Continue as Guest" during checkout. It includes a button that reopens the login/register popup so the customer can sign in instead.', 'auth-popup' ); ?>
+                </p>
+            </div>
+
             <!-- Loyalty -->
             <div id="tab-loyalty" class="auth-popup-tab-content">
                 <table class="form-table">
@@ -400,15 +443,63 @@
     });
 
     // Media picker for logo
+    // Note: wp.media (media-editor/media-views) is enqueued in the footer and
+    // hasn't loaded yet when this script runs, so the wp.media check has to
+    // happen at click time, not at bind time.
     var logoPicker = document.getElementById('ap-logo-picker');
-    if(logoPicker && typeof wp !== 'undefined' && wp.media){
+    if(logoPicker){
         logoPicker.addEventListener('click', function(){
+            if(typeof wp === 'undefined' || !wp.media) return;
             var frame = wp.media({ title: 'Choose Logo', button: { text: 'Use this image' }, multiple: false });
             frame.on('select', function(){
                 var attachment = frame.state().get('selection').first().toJSON();
                 document.getElementById('ap-logo-url').value = attachment.url;
             });
             frame.open();
+        });
+    }
+
+    // Media picker for notice image
+    var noticeImagePicker = document.getElementById('ap-notice-image-picker');
+    var noticeImageRemove = document.getElementById('ap-notice-image-remove');
+    var noticeImageField = document.getElementById('ap-notice-image-url');
+    var noticeImagePreview = document.getElementById('ap-notice-image-preview-img');
+
+    function setNoticeImage(url) {
+        noticeImageField.value = url;
+        noticeImagePreview.src = url;
+        noticeImagePreview.style.display = url ? 'block' : 'none';
+        noticeImageRemove.style.display = url ? 'inline-block' : 'none';
+    }
+
+    if (noticeImagePicker) {
+        noticeImagePicker.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            if (typeof window.wp === 'undefined' || typeof window.wp.media !== 'function') {
+                alert('The WordPress Media Library did not load. Please reload this page and disable any admin JavaScript optimization.');
+                return;
+            }
+
+            var frame = window.wp.media({
+                title: 'Choose Notice Image',
+                library: { type: 'image' },
+                button: { text: 'Use this image' },
+                multiple: false
+            });
+
+            frame.on('select', function () {
+                var attachment = frame.state().get('selection').first().toJSON();
+                setNoticeImage(attachment.url);
+            });
+
+            frame.open();
+        });
+    }
+
+    if (noticeImageRemove) {
+        noticeImageRemove.addEventListener('click', function () {
+            setNoticeImage('');
         });
     }
 

@@ -138,6 +138,7 @@ class Auth_Popup_Admin_Settings {
             'checkout_hide_shipping_form',
             'checkout_disable_ship_to_different',
             'myaccount_inline_form',
+            'notices_enabled',
         ];
 
         foreach ( $defaults as $key => $default ) {
@@ -150,7 +151,14 @@ class Auth_Popup_Admin_Settings {
                     $clean[ $key ] = esc_url_raw( $value );
                     break;
                 case 'popup_logo_url':
+                case 'notice_image_url':
                     $clean[ $key ] = esc_url_raw( $value );
+                    break;
+                case 'notice_title':
+                    $clean[ $key ] = sanitize_text_field( $value );
+                    break;
+                case 'notice_message':
+                    $clean[ $key ] = wp_kses_post( $value );
                     break;
                 case 'otp_expiry_minutes':
                 case 'otp_max_per_hour':
@@ -167,6 +175,7 @@ class Auth_Popup_Admin_Settings {
                 case 'loyalty_enabled':
                 case 'checkout_hide_shipping_form':
                 case 'checkout_disable_ship_to_different':
+                case 'notices_enabled':
                     $clean[ $key ] = ( '1' === (string) $value ) ? '1' : '0';
                     break;
                 case 'loyalty_api_url':
@@ -200,6 +209,7 @@ class Auth_Popup_Admin_Settings {
         if ( 'settings_page_auth-popup-settings' !== $hook ) {
             return;
         }
+        wp_enqueue_media();
         wp_enqueue_style(
             'auth-popup-admin',
             AUTH_POPUP_URL . 'assets/css/admin' . Auth_Popup_Core::asset_suffix() . '.css',
