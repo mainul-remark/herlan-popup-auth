@@ -430,6 +430,36 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
 
     </div><!-- /forgot panel -->
 
+    <!-- ═══════════ EMAIL VERIFICATION PANEL ═══════════ -->
+    <div class="ap-panel" id="ap-panel-email-verify">
+
+        <div class="ap-panel-header">
+            <h2 class="ap-title"><?php esc_html_e( 'Verify Your Email', 'auth-popup' ); ?></h2>
+            <p class="ap-subtitle"><?php esc_html_e( "For your account security, please verify your email address. We've sent a 6-digit code to your inbox.", 'auth-popup' ); ?></p>
+        </div>
+
+        <div class="ap-field">
+            <label><?php esc_html_e( 'Enter Code', 'auth-popup' ); ?></label>
+            <div class="ap-otp-inputs" id="ap-ev-otp-inputs">
+                <?php for ( $i = 0; $i < 6; $i++ ) : ?>
+                    <input type="tel" class="ap-otp-digit" maxlength="1" pattern="[0-9]" inputmode="numeric">
+                <?php endfor; ?>
+            </div>
+        </div>
+        <div class="ap-otp-timer">
+            <button type="button" class="ap-link" id="ap-ev-resend-btn">
+                <?php esc_html_e( 'Resend Code', 'auth-popup' ); ?>
+            </button>
+        </div>
+        <button type="button" class="ap-btn ap-btn-primary" id="ap-ev-verify-btn">
+            <?php esc_html_e( 'Verify', 'auth-popup' ); ?>
+        </button>
+        <button type="button" class="ap-link" id="ap-ev-skip-btn">
+            <?php esc_html_e( 'Skip for now', 'auth-popup' ); ?>
+        </button>
+
+    </div><!-- /email-verify panel -->
+
     <!-- ═══════════ SOCIAL LOGIN COMPLETE PANEL ═══════════ -->
     <div class="ap-panel" id="ap-panel-social-complete">
 

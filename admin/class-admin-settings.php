@@ -139,6 +139,7 @@ class Auth_Popup_Admin_Settings {
             'checkout_disable_ship_to_different',
             'myaccount_inline_form',
             'notices_enabled',
+            'email_verify_enforce_login',
         ];
 
         foreach ( $defaults as $key => $default ) {
@@ -166,6 +167,10 @@ class Auth_Popup_Admin_Settings {
                 case 'otp_max_verify_attempts':
                 case 'token_lifetime_hours':
                 case 'refresh_token_lifetime_days':
+                case 'email_verify_expiry_days':
+                case 'email_verify_otp_expiry_minutes':
+                case 'email_verify_max_per_hour':
+                case 'email_verify_max_verify_attempts':
                     $clean[ $key ] = absint( $value );
                     break;
                 case 'enable_password_login':
@@ -176,7 +181,14 @@ class Auth_Popup_Admin_Settings {
                 case 'checkout_hide_shipping_form':
                 case 'checkout_disable_ship_to_different':
                 case 'notices_enabled':
+                case 'email_verify_enforce_login':
                     $clean[ $key ] = ( '1' === (string) $value ) ? '1' : '0';
+                    break;
+                case 'email_verify_domains':
+                    $domains       = array_filter( array_map( static function ( $d ) {
+                        return ltrim( strtolower( trim( $d ) ), '@' );
+                    }, explode( ',', (string) $value ) ) );
+                    $clean[ $key ] = implode( ', ', array_values( array_unique( $domains ) ) );
                     break;
                 case 'loyalty_api_url':
                     $clean[ $key ] = esc_url_raw( $value );

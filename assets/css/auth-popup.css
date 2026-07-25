@@ -777,6 +777,37 @@
     form.woocommerce-checkout > #payment                         { order: 4; }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Checkout — email verification widget
+═══════════════════════════════════════════════════════════════ */
+.ap-checkout-verify-box {
+    font-family: var(--ap-font);
+    background: var(--ap-primary-light);
+    border: 1.5px solid var(--ap-primary);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin: 0 0 24px;
+    max-width: 480px;
+}
+.ap-checkout-verify-msg {
+    margin: 0 0 14px;
+    font-size: .88rem;
+    color: var(--ap-text);
+}
+.ap-checkout-verify-box .ap-btn {
+    width: auto;
+    padding: 0 22px;
+    height: 42px;
+    font-size: .88rem;
+}
+.ap-checkout-verify-box .ap-otp-inputs { margin: 14px 0; }
+.ap-checkout-verify-box .ap-otp-timer { justify-content: flex-start; }
+.ap-checkout-verify-error {
+    margin: 10px 0 0;
+    font-size: .82rem;
+    color: #d3455b;
+}
+
 /* ── jQuery UI Datepicker ─────────────────────────────────── */
 .ui-datepicker {
     background: #fff;

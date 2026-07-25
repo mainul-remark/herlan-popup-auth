@@ -32,6 +32,10 @@ defined( 'ABSPATH' ) || exit;
  *   PUT    /addresses/{id}
  *   DELETE /addresses/{id}
  *   POST   /addresses/{id}/default
+ *
+ * Email Verification (require authentication):
+ *   POST   /auth/send-email-verify-code
+ *   POST   /auth/verify-email-code
  */
 class Auth_Popup_REST_API {
 
@@ -291,6 +295,27 @@ class Auth_Popup_REST_API {
             'methods'             => WP_REST_Server::CREATABLE,
             'callback'            => [ __CLASS__, 'set_default_address' ],
             'permission_callback' => [ __CLASS__, 'require_login' ],
+        ] );
+
+        // ── Email Verification endpoints ────────────────────────────────
+
+        register_rest_route( $ns, '/auth/send-email-verify-code', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [ __CLASS__, 'send_email_verify_code' ],
+            'permission_callback' => [ __CLASS__, 'require_login' ],
+        ] );
+
+        register_rest_route( $ns, '/auth/verify-email-code', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [ __CLASS__, 'verify_email_code' ],
+            'permission_callback' => [ __CLASS__, 'require_login' ],
+            'args'                => [
+                'code' => [
+                    'required'          => true,
+                    'type'              => 'string',
+                    'sanitize_callback' => 'sanitize_text_field',
+                ],
+            ],
         ] );
 
         // ── Admin Settings endpoint ─────────────────────────────────────
@@ -985,6 +1010,47 @@ class Auth_Popup_REST_API {
 
         $addresses = Auth_Popup_Address_Manager::get_addresses( get_current_user_id() );
         return self::success( __( 'Address deleted.', 'auth-popup' ), $addresses );
+    }
+
+    /* ── Email Verification Callbacks ────────────────────────────────── */
+
+    public static function send_email_verify_code( WP_REST_Request $request ): WP_REST_Response {
+        $user  = wp_get_current_user();
+        $email = $user->user_email;
+
+        if ( ! Auth_Popup_Email_Verification::is_domain_required( $email ) ) {
+            return self::error( __( 'Verification is not required for this account.', 'auth-popup' ), 422 );
+        }
+
+        $result = Auth_Popup_Email_Verification::send_code( $user->ID, $email );
+        if ( is_wp_error( $result ) ) {
+            return self::error( $result->get_error_message(), 429 );
+        }
+
+        return self::success(
+            sprintf(
+                /* translators: %s: account email address */
+                __( 'Verification code sent to %s', 'auth-popup' ),
+                $email
+            ),
+            [ 'expiry_seconds' => (int) Auth_Popup_Core::get_setting( 'email_verify_otp_expiry_minutes', 10 ) * 60 ]
+        );
+    }
+
+    public static function verify_email_code( WP_REST_Request $request ): WP_REST_Response {
+        $user = wp_get_current_user();
+        $code = $request->get_param( 'code' );
+
+        if ( strlen( $code ) !== 6 || ! ctype_digit( $code ) ) {
+            return self::error( __( 'Invalid code format.', 'auth-popup' ), 422 );
+        }
+
+        $result = Auth_Popup_Email_Verification::verify_code( $user->ID, $user->user_email, $code );
+        if ( is_wp_error( $result ) ) {
+            return self::error( $result->get_error_message(), 422 );
+        }
+
+        return self::success( __( 'Email verified successfully!', 'auth-popup' ), [ 'verified' => true ] );
     }
 
     public static function get_settings( WP_REST_Request $request ): WP_REST_Response {

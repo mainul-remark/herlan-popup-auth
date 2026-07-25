@@ -18,6 +18,7 @@
                 <a href="#tab-notices"   class="nav-tab"                data-tab="tab-notices"><?php esc_html_e( 'Notices', 'auth-popup' ); ?></a>
                 <a href="#tab-loyalty"   class="nav-tab"                data-tab="tab-loyalty"><?php esc_html_e( 'Loyalty', 'auth-popup' ); ?></a>
                 <a href="#tab-checkout"  class="nav-tab"                data-tab="tab-checkout"><?php esc_html_e( 'Checkout', 'auth-popup' ); ?></a>
+                <a href="#tab-email-verify" class="nav-tab"             data-tab="tab-email-verify"><?php esc_html_e( 'Email Verification', 'auth-popup' ); ?></a>
                 <a href="#tab-migration" class="nav-tab"                data-tab="tab-migration"><?php esc_html_e( 'Migration', 'auth-popup' ); ?></a>
                 <a href="#tab-logs"      class="nav-tab"                data-tab="tab-logs"><?php esc_html_e( 'Logs', 'auth-popup' ); ?></a>
             </nav>
@@ -346,6 +347,54 @@
                                 <?php esc_html_e( 'Recommended when using the address book — shipping and billing use the same address. Disable this only if you need separate shipping and billing addresses.', 'auth-popup' ); ?>
                             </p>
                         </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Email Verification -->
+            <div id="tab-email-verify" class="auth-popup-tab-content">
+                <table class="form-table">
+                    <tr>
+                        <th><?php esc_html_e( 'Required Email Domains', 'auth-popup' ); ?></th>
+                        <td>
+                            <textarea name="auth_popup_settings[email_verify_domains]" rows="3" class="large-text" placeholder="remarkhb.com, google.com, yahoo.com"><?php echo esc_textarea( $s['email_verify_domains'] ?? '' ); ?></textarea>
+                            <p class="description">
+                                <?php esc_html_e( 'Comma-separated list of email domains (without @) that require a 6-digit email verification before checkout. Leave blank to disable this feature entirely.', 'auth-popup' ); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Re-verification Period (days)', 'auth-popup' ); ?></th>
+                        <td>
+                            <input type="number" name="auth_popup_settings[email_verify_expiry_days]" value="<?php echo absint( $s['email_verify_expiry_days'] ?? 90 ); ?>" min="0" max="3650" class="small-text">
+                            <p class="description">
+                                <?php esc_html_e( 'After this many days since last verification, the email is treated as unverified again. Set to 0 to disable re-verification entirely (once verified, always verified).', 'auth-popup' ); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Prompt at Login', 'auth-popup' ); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="auth_popup_settings[email_verify_enforce_login]" value="1" <?php checked( $s['email_verify_enforce_login'] ?? '1', '1' ); ?>>
+                                <?php esc_html_e( 'Automatically send a verification code and prompt right after login for listed-domain, unverified emails', 'auth-popup' ); ?>
+                            </label>
+                            <p class="description">
+                                <?php esc_html_e( 'This prompt is always skippable. Regardless of this setting, verification is always required before placing a WooCommerce order.', 'auth-popup' ); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Code Expiry (minutes)', 'auth-popup' ); ?></th>
+                        <td><input type="number" name="auth_popup_settings[email_verify_otp_expiry_minutes]" value="<?php echo absint( $s['email_verify_otp_expiry_minutes'] ?? 10 ); ?>" min="1" max="60" class="small-text"></td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Max Codes per Hour (per email)', 'auth-popup' ); ?></th>
+                        <td><input type="number" name="auth_popup_settings[email_verify_max_per_hour]" value="<?php echo absint( $s['email_verify_max_per_hour'] ?? 5 ); ?>" min="1" max="50" class="small-text"></td>
+                    </tr>
+                    <tr>
+                        <th><?php esc_html_e( 'Max Verify Attempts', 'auth-popup' ); ?></th>
+                        <td><input type="number" name="auth_popup_settings[email_verify_max_verify_attempts]" value="<?php echo absint( $s['email_verify_max_verify_attempts'] ?? 5 ); ?>" min="1" max="20" class="small-text"></td>
                     </tr>
                 </table>
             </div>

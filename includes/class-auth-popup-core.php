@@ -27,7 +27,7 @@ class Auth_Popup_Core {
         $this->load_textdomain();
 
         // Upgrade DB tables if needed (handles already-active installs)
-        if ( get_option( 'auth_popup_db_version' ) !== '1.2' ) {
+        if ( get_option( 'auth_popup_db_version' ) !== '1.3' ) {
             self::create_tables();
         }
 
@@ -75,6 +75,10 @@ class Auth_Popup_Core {
         Auth_Popup_Admin_Settings::init();
         Auth_Popup_Public_Frontend::init();
         Auth_Popup_Notice_Manager::init();
+        Auth_Popup_Checkout_Guard::init();
+
+        // Reset email verification if the account's email address changes
+        add_action( 'profile_update', [ 'Auth_Popup_Email_Verification', 'maybe_reset_on_email_change' ], 10, 2 );
     }
 
     private function load_textdomain(): void {
@@ -146,14 +150,22 @@ class Auth_Popup_Core {
         ) {$charset};" );
 
         // User profiles — fast indexed lookups by phone / OAuth ID
-        dbDelta( "CREATE TABLE IF NOT EXISTS {$wpdb->prefix}auth_popup_user_profiles (
-            user_id          BIGINT(20) UNSIGNED NOT NULL,
-            phone            VARCHAR(20)         DEFAULT NULL,
-            google_id        VARCHAR(100)        DEFAULT NULL,
-            facebook_id      VARCHAR(100)        DEFAULT NULL,
-            google_avatar    VARCHAR(500)        DEFAULT NULL,
-            facebook_avatar  VARCHAR(500)        DEFAULT NULL,
-            PRIMARY KEY      (user_id),
+        // NOTE: no "IF NOT EXISTS" here — dbDelta() mis-parses that clause
+        // (extracts "IF" as the table name), which makes it skip the
+        // column-diff/ALTER path entirely on an already-existing table and
+        // silently no-op instead of adding new columns. dbDelta expects a
+        // plain "CREATE TABLE tablename (" and decides itself whether to
+        // CREATE or ALTER based on live schema introspection.
+        dbDelta( "CREATE TABLE {$wpdb->prefix}auth_popup_user_profiles (
+            user_id            BIGINT(20) UNSIGNED NOT NULL,
+            phone              VARCHAR(20)         DEFAULT NULL,
+            google_id          VARCHAR(100)        DEFAULT NULL,
+            facebook_id        VARCHAR(100)        DEFAULT NULL,
+            google_avatar      VARCHAR(500)        DEFAULT NULL,
+            facebook_avatar    VARCHAR(500)        DEFAULT NULL,
+            email_verified     TINYINT(1)          NOT NULL DEFAULT 0,
+            email_verified_at  DATETIME            DEFAULT NULL,
+            PRIMARY KEY        (user_id),
             UNIQUE KEY phone       (phone),
             KEY        google_id   (google_id),
             KEY        facebook_id (facebook_id)
@@ -181,7 +193,7 @@ class Auth_Popup_Core {
             KEY user_default (user_id, is_default)
         ) {$charset};" );
 
-        update_option( 'auth_popup_db_version', '1.2' );
+        update_option( 'auth_popup_db_version', '1.3' );
     }
 
     /* ── Combined Mobile + Email Migration ────────────────────────── */
@@ -655,6 +667,13 @@ class Auth_Popup_Core {
             'rest_api_key'                      => '',
             'token_lifetime_hours'              => 12,
             'refresh_token_lifetime_days'       => 7,
+            // Email Verification
+            'email_verify_domains'             => '',
+            'email_verify_expiry_days'         => 90,
+            'email_verify_enforce_login'       => '1',
+            'email_verify_otp_expiry_minutes'  => 10,
+            'email_verify_max_per_hour'        => 5,
+            'email_verify_max_verify_attempts' => 5,
         ];
     }
 

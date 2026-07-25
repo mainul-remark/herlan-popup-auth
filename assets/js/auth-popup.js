@@ -20,6 +20,10 @@
             // Runs for all users — has its own isLoggedIn guard inside
             this.initAccountDrawer();
             this.cleanLoginRedirectParams();
+            // Runs on any page (incl. checkout for logged-in users, where the
+            // popup overlay itself isn't rendered) — guarded by element presence
+            this.bindOTPInputs();
+            this.bindCheckoutEmailVerify();
 
             // Support popup mode (all pages) and inline mode (my-account / shortcode)
             this.$overlay    = $('#auth-popup-overlay');
@@ -45,7 +49,6 @@
             this.bindMainTabs();
             this.bindModeTabs();
             this.bindSendOTP();
-            this.bindOTPInputs();
             this.bindBackBtns();
             this.bindForms();
             this.bindPasswordToggle();
@@ -54,6 +57,7 @@
             this.bindLoyaltyToggle();
             this.bindSwitchLinks();
             this.bindForgotPanel();
+            this.bindEmailVerifyPanel();
             this.bindHeaderBack();
             this.initGoogle();
             this.initFacebook();
@@ -256,8 +260,11 @@
         },
 
         /* ── OTP digit inputs ───────────────────────────────────────── */
+        // Delegated on document (not this.$ctx) so it also covers the
+        // checkout email-verify widget, which lives outside the popup
+        // overlay / inline wrap for logged-in users.
         bindOTPInputs() {
-            this.$ctx.on('input keydown paste', '.ap-otp-digit', function (e) {
+            $(document).on('input keydown paste', '.ap-otp-digit', function (e) {
                 const $inputs = $(this).closest('.ap-otp-inputs').find('.ap-otp-digit');
                 const idx     = $inputs.index(this);
 
@@ -467,9 +474,14 @@
                     $btn.removeClass('ap-loading').prop('disabled', false);
                     if (res.success) {
                         this.showAlert('success', res.data.message || AuthPopup.i18n.success);
-                        setTimeout(() => {
-                            this.redirectAfterLogin(res.data.redirect || AuthPopup.redirectUrl);
-                        }, 800);
+                        const redirectUrl = res.data.redirect || AuthPopup.redirectUrl;
+                        if (res.data.needs_email_verification) {
+                            setTimeout(() => this.showEmailVerifyPanel(redirectUrl), 800);
+                        } else {
+                            setTimeout(() => {
+                                this.redirectAfterLogin(redirectUrl);
+                            }, 800);
+                        }
                     } else {
                         this.showAlert('error', res.data.message || 'Error occurred.');
                     }
@@ -844,6 +856,77 @@
             }, { scope: 'public_profile,email' });
         },
 
+        /* ── Checkout: email verification widget (logged-in users) ──── */
+        bindCheckoutEmailVerify() {
+            const $widget = $('#ap-checkout-email-verify');
+            if (!$widget.length) return;
+
+            const $sendBtn   = $widget.find('#ap-checkout-send-code');
+            const $otpInputs = $widget.find('#ap-checkout-otp-inputs');
+            const $verifyBtn = $widget.find('#ap-checkout-verify-code-btn');
+            const $timer     = $widget.find('#ap-checkout-otp-timer');
+            const $msg       = $widget.find('.ap-checkout-verify-msg');
+
+            $sendBtn.on('click', () => {
+                $sendBtn.addClass('ap-loading').prop('disabled', true);
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_send_email_verify_code',
+                        nonce:  AuthPopup.nonce,
+                    },
+                    success: (res) => {
+                        $sendBtn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            $sendBtn.hide();
+                            $otpInputs.show();
+                            $verifyBtn.show();
+                            $timer.show();
+                            $otpInputs.find('.ap-otp-digit').first().focus();
+                        } else {
+                            $widget.append('<p class="ap-checkout-verify-error">' + res.data.message + '</p>');
+                        }
+                    },
+                    error: () => {
+                        $sendBtn.removeClass('ap-loading').prop('disabled', false);
+                    },
+                });
+            });
+
+            $verifyBtn.on('click', () => {
+                const code = this.getOtpCode($otpInputs);
+                if (!code || code.length !== 6) return;
+
+                $verifyBtn.addClass('ap-loading').prop('disabled', true);
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_verify_email_code',
+                        nonce:  AuthPopup.nonce,
+                        code:   code,
+                    },
+                    success: (res) => {
+                        $verifyBtn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            $widget.find('.ap-checkout-verify-error').remove();
+                            $msg.html('&#10003; ' + res.data.message + ' ' + this.i18n('Click "Place order" to continue.'));
+                            $otpInputs.hide();
+                            $verifyBtn.hide();
+                            $timer.hide();
+                        } else {
+                            $widget.find('.ap-checkout-verify-error').remove();
+                            $widget.append('<p class="ap-checkout-verify-error">' + res.data.message + '</p>');
+                        }
+                    },
+                    error: () => {
+                        $verifyBtn.removeClass('ap-loading').prop('disabled', false);
+                    },
+                });
+            });
+        },
+
         /* ── Checkout: auto-open popup + Continue as Guest ─────────── */
         initCheckout() {
             if (AuthPopup.isLoggedIn === '1') return;
@@ -1110,6 +1193,85 @@
             $('#ap-forgot-otp').val('');
             $('#ap-forgot-new-password').val('');
             $('#ap-forgot-confirm-password').val('');
+        },
+
+        /* ── Email domain verification (post-login, skippable) ──────── */
+        getOtpCode($container) {
+            return $container.find('.ap-otp-digit').map((_, el) => $(el).val()).get().join('');
+        },
+
+        showEmailVerifyPanel(pendingRedirect) {
+            this._evPendingRedirect = pendingRedirect || AuthPopup.redirectUrl;
+            this.$ctx.find('.ap-tab').removeClass('active');
+            this.$ctx.find('.ap-panel').removeClass('active');
+            $('#ap-panel-email-verify').addClass('active');
+            $('#ap-ev-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+            this.clearAlert();
+            if (this.$dialog) this.$dialog.scrollTop(0);
+            setTimeout(() => $('#ap-ev-otp-inputs .ap-otp-digit').first().focus(), 100);
+        },
+
+        bindEmailVerifyPanel() {
+            this.$ctx.on('click', '#ap-ev-verify-btn', (e) => {
+                const $btn = $(e.currentTarget);
+                const code = this.getOtpCode($('#ap-ev-otp-inputs'));
+
+                if (!code || code.length !== 6) {
+                    this.showAlert('error', this.i18n('Please enter the 6-digit code.'));
+                    return;
+                }
+
+                $btn.addClass('ap-loading').prop('disabled', true);
+                this.clearAlert();
+
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_verify_email_code',
+                        nonce:  AuthPopup.nonce,
+                        code:   code,
+                    },
+                    success: (res) => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        if (res.success) {
+                            this.showAlert('success', res.data.message);
+                            setTimeout(() => this.redirectAfterLogin(this._evPendingRedirect), 800);
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => {
+                        $btn.removeClass('ap-loading').prop('disabled', false);
+                        this.showAlert('error', AuthPopup.i18n.error_network);
+                    },
+                });
+            });
+
+            this.$ctx.on('click', '#ap-ev-resend-btn', () => {
+                this.clearAlert();
+                $.ajax({
+                    url:    AuthPopup.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'auth_popup_send_email_verify_code',
+                        nonce:  AuthPopup.nonce,
+                    },
+                    success: (res) => {
+                        if (res.success) {
+                            $('#ap-ev-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+                            this.showAlert('success', res.data.message);
+                        } else {
+                            this.showAlert('error', res.data.message);
+                        }
+                    },
+                    error: () => this.showAlert('error', AuthPopup.i18n.error_network),
+                });
+            });
+
+            this.$ctx.on('click', '#ap-ev-skip-btn', () => {
+                this.redirectAfterLogin(this._evPendingRedirect);
+            });
         },
 
         /* ── Header back button ──────────────────────────────────────── */

@@ -43,6 +43,16 @@ class Auth_Popup_Ajax_Handler {
         foreach ( $address_actions as $action ) {
             add_action( 'wp_ajax_' . $action, [ __CLASS__, $action ] );
         }
+
+        // Email domain verification — logged-in users only (always acts on
+        // the current user's own account email)
+        $email_verify_actions = [
+            'auth_popup_send_email_verify_code',
+            'auth_popup_verify_email_code',
+        ];
+        foreach ( $email_verify_actions as $action ) {
+            add_action( 'wp_ajax_' . $action, [ __CLASS__, $action ] );
+        }
     }
 
     public static function auth_popup_refresh_nonce(): void {
@@ -129,8 +139,9 @@ class Auth_Popup_Ajax_Handler {
         self::clear_password_failures( $credential );
 
         self::success( array_merge( [
-            'message'  => __( 'Login successful!', 'auth-popup' ),
-            'redirect' => self::redirect_url(),
+            'message'                  => __( 'Login successful!', 'auth-popup' ),
+            'redirect'                 => self::redirect_url(),
+            'needs_email_verification' => self::maybe_prompt_email_verification( $user ),
         ], self::try_loyalty_login( $user ) ) );
     }
 
@@ -166,8 +177,9 @@ class Auth_Popup_Ajax_Handler {
         }
 
         self::success( array_merge( [
-            'message'  => __( 'Login successful!', 'auth-popup' ),
-            'redirect' => self::redirect_url(),
+            'message'                  => __( 'Login successful!', 'auth-popup' ),
+            'redirect'                 => self::redirect_url(),
+            'needs_email_verification' => self::maybe_prompt_email_verification( $user ),
         ], self::try_loyalty_login( $user ) ) );
     }
 
@@ -225,8 +237,9 @@ class Auth_Popup_Ajax_Handler {
         }
 
         self::success( [
-            'message'  => $message,
-            'redirect' => self::redirect_url(),
+            'message'                  => $message,
+            'redirect'                 => self::redirect_url(),
+            'needs_email_verification' => self::maybe_prompt_email_verification( $user ),
         ] );
     }
 
@@ -481,6 +494,7 @@ class Auth_Popup_Ajax_Handler {
                     if ( is_wp_error( $user ) ) {
                         self::error( $user->get_error_message() );
                     }
+                    self::mark_oauth_email_verified( $user );
                     self::success( array_merge( [
                         'message'  => __( 'Logged in with Google!', 'auth-popup' ),
                         'redirect' => self::redirect_url(),
@@ -532,6 +546,7 @@ class Auth_Popup_Ajax_Handler {
                     if ( is_wp_error( $user ) ) {
                         self::error( $user->get_error_message() );
                     }
+                    self::mark_oauth_email_verified( $user );
                     self::success( array_merge( [
                         'message'  => __( 'Logged in with Facebook!', 'auth-popup' ),
                         'redirect' => self::redirect_url(),
@@ -626,6 +641,7 @@ class Auth_Popup_Ajax_Handler {
         if ( is_wp_error( $user ) ) {
             self::error( $user->get_error_message() );
         }
+        self::mark_oauth_email_verified( $user );
 
         // Optional: Herlan Star Loyalty registration
         $loyalty_message = '';
@@ -644,6 +660,53 @@ class Auth_Popup_Ajax_Handler {
             'message'  => $message,
             'redirect' => self::redirect_url(),
         ], self::try_loyalty_login( $user ) ) );
+    }
+
+    /* ── Email Domain Verification ─────────────────────────────────── */
+
+    public static function auth_popup_send_email_verify_code(): void {
+        self::verify_nonce();
+        self::require_login();
+
+        $user  = wp_get_current_user();
+        $email = $user->user_email;
+
+        if ( ! Auth_Popup_Email_Verification::is_domain_required( $email ) ) {
+            self::error( __( 'Verification is not required for this account.', 'auth-popup' ) );
+        }
+
+        $result = Auth_Popup_Email_Verification::send_code( $user->ID, $email );
+        if ( is_wp_error( $result ) ) {
+            self::error( $result->get_error_message() );
+        }
+
+        self::success( [
+            /* translators: %s: account email address */
+            'message'        => sprintf( __( 'Verification code sent to %s', 'auth-popup' ), $email ),
+            'expiry_seconds' => (int) Auth_Popup_Core::get_setting( 'email_verify_otp_expiry_minutes', 10 ) * 60,
+        ] );
+    }
+
+    public static function auth_popup_verify_email_code(): void {
+        self::verify_nonce();
+        self::require_login();
+
+        $user = wp_get_current_user();
+        $code = sanitize_text_field( $_POST['code'] ?? '' );
+
+        if ( strlen( $code ) !== 6 || ! ctype_digit( $code ) ) {
+            self::error( __( 'Invalid code format.', 'auth-popup' ) );
+        }
+
+        $result = Auth_Popup_Email_Verification::verify_code( $user->ID, $user->user_email, $code );
+        if ( is_wp_error( $result ) ) {
+            self::error( $result->get_error_message() );
+        }
+
+        self::success( [
+            'message'  => __( 'Email verified successfully!', 'auth-popup' ),
+            'verified' => true,
+        ] );
     }
 
     /* ── Logout ─────────────────────────────────────────────────────── */
@@ -1079,6 +1142,36 @@ class Auth_Popup_Ajax_Handler {
     }
 
     /* ── Helpers ─────────────────────────────────────────────────────── */
+
+    /**
+     * For password/OTP/register logins: if the account's email domain
+     * requires verification and isn't currently verified, kick off a code
+     * send (best-effort) and tell the caller to show the verify step.
+     * Always dismissible — login itself is never blocked by this.
+     */
+    private static function maybe_prompt_email_verification( \WP_User $user ): bool {
+        if ( '1' !== (string) Auth_Popup_Core::get_setting( 'email_verify_enforce_login', '1' ) ) {
+            return false;
+        }
+
+        $needs = Auth_Popup_Email_Verification::needs_verification( $user->ID, $user->user_email );
+        if ( $needs ) {
+            Auth_Popup_Email_Verification::send_code( $user->ID, $user->user_email ); // best-effort
+        }
+
+        return $needs;
+    }
+
+    /**
+     * OAuth providers already vouch for the email address, so a required-domain
+     * email reached via Google/Facebook is trusted immediately — this is a flag
+     * write only, never a check/prompt (that's what keeps OAuth logins exempt).
+     */
+    private static function mark_oauth_email_verified( \WP_User $user ): void {
+        if ( Auth_Popup_Email_Verification::is_domain_required( $user->user_email ) ) {
+            Auth_Popup_Email_Verification::mark_verified( $user->ID );
+        }
+    }
 
     private static function require_login(): void {
         if ( ! is_user_logged_in() ) {
