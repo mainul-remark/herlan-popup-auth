@@ -204,29 +204,59 @@
                 $btn.addClass('ap-loading').prop('disabled', true);
                 this.clearAlert();
 
-                $.ajax({
-                    url:    AuthPopup.ajaxUrl,
-                    method: 'POST',
-                    data: {
-                        action:  'auth_popup_send_otp',
-                        nonce:   AuthPopup.nonce,
-                        phone:   phone,
-                        context: form,
-                    },
-                    success: (res) => {
-                        $btn.removeClass('ap-loading').prop('disabled', false);
-                        if (res.success) {
-                            this.goToOTPStep(form, phone, res.data.expiry_seconds || 300);
-                            this.showAlert('success', res.data.message);
-                        } else {
-                            this.showAlert('error', res.data.message || this.i18n('Failed to send OTP.'));
-                        }
-                    },
-                    error: () => {
-                        $btn.removeClass('ap-loading').prop('disabled', false);
-                        this.showAlert('error', AuthPopup.i18n.error_network);
-                    },
-                });
+                if (form === 'register') {
+                    // Authoritative re-check right before sending the OTP. The
+                    // on-input/blur check (bindPhoneCheck) is debounced and can
+                    // still be in flight when Continue is clicked, so we can't
+                    // rely on the button's disabled state alone here.
+                    // Login is untouched — it falls straight through to
+                    // sendOTPRequest() below, exactly as before.
+                    $.ajax({
+                        url:    AuthPopup.ajaxUrl,
+                        method: 'POST',
+                        data:   { action: 'auth_popup_check_phone', nonce: AuthPopup.nonce, phone },
+                        success: (res) => {
+                            if (res.success && res.data.valid && res.data.exists) {
+                                $btn.removeClass('ap-loading').prop('disabled', true);
+                                $('#ap-reg-phone').closest('.ap-field').find('.ap-phone-check-msg')
+                                    .text('Account exists. Please login instead.').addClass('taken');
+                                this.showAlert('error', this.i18n('This mobile number is already registered. Please login instead.'));
+                                return;
+                            }
+                            this.sendOTPRequest(form, phone, $btn);
+                        },
+                        error: () => this.sendOTPRequest(form, phone, $btn),
+                    });
+                    return;
+                }
+
+                this.sendOTPRequest(form, phone, $btn);
+            });
+        },
+
+        sendOTPRequest(form, phone, $btn) {
+            $.ajax({
+                url:    AuthPopup.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action:  'auth_popup_send_otp',
+                    nonce:   AuthPopup.nonce,
+                    phone:   phone,
+                    context: form,
+                },
+                success: (res) => {
+                    $btn.removeClass('ap-loading').prop('disabled', false);
+                    if (res.success) {
+                        this.goToOTPStep(form, phone, res.data.expiry_seconds || 300);
+                        this.showAlert('success', res.data.message);
+                    } else {
+                        this.showAlert('error', res.data.message || this.i18n('Failed to send OTP.'));
+                    }
+                },
+                error: () => {
+                    $btn.removeClass('ap-loading').prop('disabled', false);
+                    this.showAlert('error', AuthPopup.i18n.error_network);
+                },
             });
         },
 
