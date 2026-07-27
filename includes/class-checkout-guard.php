@@ -2,59 +2,31 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Blocks WooCommerce order placement for logged-in users whose account
- * email's domain requires verification (Auth_Popup_Email_Verification) and
- * isn't currently verified. Renders a verification widget above the
- * checkout form so shoppers can resolve it without losing checkout progress.
+ * Renders a non-blocking email-verification reminder bar on the checkout
+ * page for logged-in users whose account email's domain requires
+ * verification (Auth_Popup_Email_Verification) and isn't currently
+ * verified. Placing an order is never blocked here — payment methods that
+ * require a verified email (e.g. Herlan Pay Later) are responsible for
+ * hiding themselves via Auth_Popup_Email_Verification::is_verified().
  */
 class Auth_Popup_Checkout_Guard {
 
     public static function init(): void {
-        add_action( 'woocommerce_after_checkout_validation', [ __CLASS__, 'validate' ], 10, 2 );
-        add_action( 'woocommerce_before_checkout_form',       [ __CLASS__, 'render_widget' ], 15 );
+        // Priority 9: right before the theme's .promo-bar (priority 10 on
+        // the same hook), so this bar renders directly above it.
+        add_action( 'shoptimizer_before_header', [ __CLASS__, 'render_bar' ], 9 );
     }
 
     /**
-     * Fires after WooCommerce's own checkout POST validation, before the
-     * order is created. Adding an error here blocks order creation and
-     * WooCommerce automatically re-renders the checkout with the notice.
+     * Fires in the theme header, before <header>, on every page — so this
+     * only prints on the checkout page itself, not the order-received
+     * endpoint (verification is irrelevant once the order is placed).
      */
-    public static function validate( array $data, \WP_Error $errors ): void {
-        if ( ! is_user_logged_in() ) {
-            return; // guest checkout is out of scope for this feature
-        }
-
-        $user  = wp_get_current_user();
-        $email = $user->user_email;
-
-        if ( ! Auth_Popup_Email_Verification::is_domain_required( $email ) ) {
+    public static function render_bar(): void {
+        if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url( 'order-received' ) ) {
             return;
         }
 
-        if ( Auth_Popup_Email_Verification::is_verified( $user->ID, $email ) ) {
-            return;
-        }
-
-        // Best-effort: ensure a live code exists. Ignore rate-limit errors —
-        // a still-valid code may already have been sent.
-        Auth_Popup_Email_Verification::send_code( $user->ID, $email );
-
-        $errors->add(
-            'auth_popup_email_unverified',
-            sprintf(
-                /* translators: %s: account email address */
-                __( 'Please verify your account email (%s) before placing your order. Enter the 6-digit code sent to your inbox in the box above the checkout form, then click "Place order" again.', 'auth-popup' ),
-                esc_html( $email )
-            )
-        );
-    }
-
-    /**
-     * Renders the verification widget outside form.checkout (via
-     * woocommerce_before_checkout_form) so it survives repeated failed
-     * submits without WooCommerce's checkout.js wiping or duplicating it.
-     */
-    public static function render_widget(): void {
         if ( ! is_user_logged_in() ) {
             return;
         }

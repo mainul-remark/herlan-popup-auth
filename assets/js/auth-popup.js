@@ -896,6 +896,14 @@
             const $verifyBtn = $widget.find('#ap-checkout-verify-code-btn');
             const $timer     = $widget.find('#ap-checkout-otp-timer');
             const $msg       = $widget.find('.ap-checkout-verify-msg');
+            const $closeBtn  = $widget.find('#ap-checkout-verify-close');
+
+            $closeBtn.on('click', () => {
+                $widget.hide();
+                try {
+                    sessionStorage.setItem('ap_checkout_verify_dismissed', '1');
+                } catch (e) {}
+            });
 
             $sendBtn.on('click', () => {
                 $sendBtn.addClass('ap-loading').prop('disabled', true);
@@ -910,6 +918,7 @@
                         $sendBtn.removeClass('ap-loading').prop('disabled', false);
                         if (res.success) {
                             $sendBtn.hide();
+                            $msg.text(this.i18n('Enter code:'));
                             $otpInputs.show();
                             $verifyBtn.show();
                             $timer.show();
@@ -941,10 +950,14 @@
                         $verifyBtn.removeClass('ap-loading').prop('disabled', false);
                         if (res.success) {
                             $widget.find('.ap-checkout-verify-error').remove();
-                            $msg.html('&#10003; ' + res.data.message + ' ' + this.i18n('Click "Place order" to continue.'));
+                            $msg.html('&#10003; ' + res.data.message);
                             $otpInputs.hide();
                             $verifyBtn.hide();
                             $timer.hide();
+                            // Refresh WooCommerce's payment method list so any
+                            // gateway gated on email verification (e.g. Pay
+                            // Later) appears without a full page reload.
+                            $(document.body).trigger('update_checkout');
                         } else {
                             $widget.find('.ap-checkout-verify-error').remove();
                             $widget.append('<p class="ap-checkout-verify-error">' + res.data.message + '</p>');

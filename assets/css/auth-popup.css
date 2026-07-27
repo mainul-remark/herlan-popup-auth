@@ -778,34 +778,102 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Checkout — email verification widget
+   Checkout — email verification reminder bar (site-wide banner
+   style, printed directly under the theme's .promo-bar)
 ═══════════════════════════════════════════════════════════════ */
-.ap-checkout-verify-box {
+.ap-checkout-verify-bar {
+    width: 100%;
+    box-sizing: border-box;
     font-family: var(--ap-font);
-    background: var(--ap-primary-light);
-    border: 1.5px solid var(--ap-primary);
-    border-radius: 14px;
-    padding: 18px 20px;
-    margin: 0 0 24px;
-    max-width: 480px;
+    background: #000;
+    padding: 5px 16px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    line-height: 1.3rem;
 }
 .ap-checkout-verify-msg {
-    margin: 0 0 14px;
-    font-size: .88rem;
-    color: var(--ap-text);
-}
-.ap-checkout-verify-box .ap-btn {
-    width: auto;
-    padding: 0 22px;
-    height: 42px;
-    font-size: .88rem;
-}
-.ap-checkout-verify-box .ap-otp-inputs { margin: 14px 0; }
-.ap-checkout-verify-box .ap-otp-timer { justify-content: flex-start; }
-.ap-checkout-verify-error {
-    margin: 10px 0 0;
+    margin: 0;
     font-size: .82rem;
-    color: #d3455b;
+    line-height: 1.3rem;
+    font-weight: 500;
+    color: #fff;
+    text-align: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ap-checkout-verify-bar .ap-btn {
+    width: auto;
+    padding: 0 12px;
+    height: 22px;
+    font-size: .7rem;
+    font-weight: 600;
+    margin-top: 0;
+    flex-shrink: 0;
+    background: #fff;
+    color: var(--ap-primary-dark);
+    border: none;
+    box-shadow: none;
+}
+.ap-checkout-verify-bar .ap-btn:hover:not(:disabled) {
+    background: #f2f2f2;
+    color: var(--ap-primary-dark);
+}
+.ap-checkout-verify-bar .ap-btn.ap-loading::before { width: 11px; height: 11px; border-width: 1.5px; }
+.ap-checkout-verify-bar .ap-otp-inputs { margin: 0; gap: 5px; flex-shrink: 0; }
+.ap-checkout-verify-bar .ap-otp-digit {
+    width: 20px;
+    height: 22px;
+    font-size: .72rem;
+    border: none;
+    border-radius: 5px;
+}
+.ap-checkout-verify-bar .ap-otp-timer {
+    justify-content: center;
+    margin: 0;
+    min-height: 0;
+    color: rgba(255,255,255,.85);
+    font-size: .68rem;
+    flex-shrink: 0;
+}
+.ap-checkout-verify-error {
+    flex-basis: 100%;
+    margin: 2px 0 0;
+    font-size: .68rem;
+    color: #fff;
+    text-align: center;
+}
+.ap-checkout-verify-close {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,.75);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--ap-transition);
+}
+.ap-checkout-verify-close:hover { color: #fff; }
+@media (max-width: 768px) {
+    .ap-checkout-verify-bar { padding: 4px 10px; gap: 6px; flex-wrap: nowrap; line-height: 1.2; }
+    .ap-checkout-verify-msg {
+        font-size: .65rem;
+        line-height: 1.2;
+    }
+    .ap-checkout-verify-bar .ap-otp-digit { width: 20px; height: 22px; font-size: .68rem; }
+    .ap-checkout-verify-bar .ap-btn { height: 20px; font-size: .62rem; padding: 0 10px; }
+    .ap-checkout-verify-close { width: 16px; height: 16px; font-size: .95rem; }
 }
 
 /* ── jQuery UI Datepicker ─────────────────────────────────── */

@@ -1,10 +1,10 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
-<div id="ap-checkout-email-verify" class="ap-checkout-verify-box" data-email="<?php echo esc_attr( $user->user_email ); ?>">
+<div id="ap-checkout-email-verify" class="ap-checkout-verify-bar" data-email="<?php echo esc_attr( $user->user_email ); ?>">
     <p class="ap-checkout-verify-msg">
         <?php
         printf(
             /* translators: %s: account email address */
-            esc_html__( 'Please verify your account email (%s) before placing your order.', 'auth-popup' ),
+            esc_html__( 'Please verify your account email (%s) to enable "Pay Later" payment method.', 'auth-popup' ),
             '<strong>' . esc_html( $user->user_email ) . '</strong>'
         );
         ?>
@@ -29,4 +29,16 @@
     <button type="button" class="ap-btn ap-btn-primary" id="ap-checkout-verify-code-btn" style="display:none;">
         <?php esc_html_e( 'Verify', 'auth-popup' ); ?>
     </button>
+
+    <button type="button" class="ap-checkout-verify-close" id="ap-checkout-verify-close" aria-label="<?php esc_attr_e( 'Dismiss', 'auth-popup' ); ?>">&times;</button>
 </div>
+<script>
+(function () {
+    try {
+        if ( sessionStorage.getItem( 'ap_checkout_verify_dismissed' ) === '1' ) {
+            var el = document.getElementById( 'ap-checkout-email-verify' );
+            if ( el ) { el.style.display = 'none'; }
+        }
+    } catch ( e ) {}
+})();
+</script>
