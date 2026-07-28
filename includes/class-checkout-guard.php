@@ -2,12 +2,13 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Renders a non-blocking email-verification reminder bar on the checkout
- * page for logged-in users whose account email's domain requires
- * verification (Auth_Popup_Email_Verification) and isn't currently
- * verified. Placing an order is never blocked here — payment methods that
- * require a verified email (e.g. Herlan Pay Later) are responsible for
- * hiding themselves via Auth_Popup_Email_Verification::is_verified().
+ * Renders a non-blocking email-verification reminder bar site-wide for
+ * logged-in users who (a) hold a role allowed to use the Herlan Pay Later
+ * gateway and (b) have an account email whose domain requires verification
+ * (Auth_Popup_Email_Verification) and isn't currently verified. Placing an
+ * order is never blocked here — payment methods that require a verified
+ * email (e.g. Herlan Pay Later) are responsible for hiding themselves via
+ * Auth_Popup_Email_Verification::is_verified().
  */
 class Auth_Popup_Checkout_Guard {
 
@@ -18,12 +19,16 @@ class Auth_Popup_Checkout_Guard {
     }
 
     /**
-     * Fires in the theme header, before <header>, on every page — so this
-     * only prints on the checkout page itself, not the order-received
-     * endpoint (verification is irrelevant once the order is placed).
+     * Fires in the theme header, before <header>, on every front-end page
+     * except the order-received endpoint (verification is irrelevant once
+     * the order is placed).
      */
     public static function render_bar(): void {
-        if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url( 'order-received' ) ) {
+        if ( is_admin() ) {
+            return;
+        }
+
+        if ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-received' ) ) {
             return;
         }
 
@@ -31,7 +36,22 @@ class Auth_Popup_Checkout_Guard {
             return;
         }
 
+        // Herlan Pay Later isn't active — the bar's "enable Pay Later"
+        // messaging wouldn't apply to anyone.
+        if ( ! defined( 'HPL_GATEWAY_ID' ) ) {
+            return;
+        }
+
         $user = wp_get_current_user();
+
+        $gateway_settings = get_option( 'woocommerce_' . HPL_GATEWAY_ID . '_settings', array() );
+        $allowed_roles    = isset( $gateway_settings['allowed_roles'] ) ? (array) $gateway_settings['allowed_roles'] : array();
+        $feature_policy   = isset( $gateway_settings['feature_policy'] ) ? $gateway_settings['feature_policy'] : '';
+
+        if ( empty( $allowed_roles ) || ! array_intersect( (array) $user->roles, $allowed_roles ) ) {
+            return;
+        }
+
         if ( ! Auth_Popup_Email_Verification::needs_verification( $user->ID, $user->user_email ) ) {
             return;
         }

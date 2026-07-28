@@ -850,6 +850,7 @@
 }
 .ap-checkout-verify-close {
     flex-shrink: 0;
+    margin-left: auto;
     width: 20px;
     height: 20px;
     padding: 0;
@@ -866,13 +867,17 @@
 }
 .ap-checkout-verify-close:hover { color: #fff; }
 @media (max-width: 768px) {
-    .ap-checkout-verify-bar { padding: 4px 10px; gap: 6px; flex-wrap: nowrap; line-height: 1.2; }
+    .ap-checkout-verify-bar { padding: 6px 10px; gap: 4px 6px; flex-wrap: wrap; line-height: 1.2; }
     .ap-checkout-verify-msg {
+        flex: 1 1 100%;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
         font-size: .65rem;
         line-height: 1.2;
     }
     .ap-checkout-verify-bar .ap-otp-digit { width: 20px; height: 22px; font-size: .68rem; }
-    .ap-checkout-verify-bar .ap-btn { height: 20px; font-size: .62rem; padding: 0 10px; }
+    .ap-checkout-verify-bar .ap-btn { margin-left: auto; height: 20px; font-size: .62rem; padding: 0 10px; }
     .ap-checkout-verify-close { width: 16px; height: 16px; font-size: .95rem; }
 }
 

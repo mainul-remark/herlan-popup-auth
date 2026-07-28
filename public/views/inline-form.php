@@ -455,7 +455,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
             <?php esc_html_e( 'Verify', 'auth-popup' ); ?>
         </button>
         <button type="button" class="ap-link" id="ap-ev-skip-btn">
-            <?php esc_html_e( 'Skip for now', 'auth-popup' ); ?>
+<!--            --><?php //esc_html_e( 'Skip for now', 'auth-popup' ); ?>
         </button>
 
     </div><!-- /email-verify panel -->
