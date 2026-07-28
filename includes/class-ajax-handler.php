@@ -1101,11 +1101,11 @@ class Auth_Popup_Ajax_Handler {
         $window = 15 * MINUTE_IN_SECONDS;
 
         if ( (int) get_transient( self::pw_ip_key() ) >= 10 ) {
-            self::error( __( 'Too many login attempts from your network. Please try again in 15 minutes.', 'auth-popup' ), 429 );
+            self::error( __( 'Too many login attempts from your network. Please try again in 15 minutes.', 'auth-popup' ) );
         }
 
         if ( (int) get_transient( self::pw_cred_key( $credential ) ) >= 5 ) {
-            self::error( __( 'Too many login attempts for this account. Please try again in 15 minutes.', 'auth-popup' ), 429 );
+            self::error( __( 'Too many login attempts for this account. Please try again in 15 minutes.', 'auth-popup' ) );
         }
     }
 
@@ -1188,13 +1188,13 @@ class Auth_Popup_Ajax_Handler {
 
     private static function require_login(): void {
         if ( ! is_user_logged_in() ) {
-            self::error( __( 'You must be logged in.', 'auth-popup' ), 403 );
+            self::error( __( 'You must be logged in.', 'auth-popup' ) );
         }
     }
 
     private static function verify_nonce(): void {
         if ( ! check_ajax_referer( 'auth_popup_nonce', 'nonce', false ) ) {
-            self::error( __( 'Security check failed. Please refresh the page.', 'auth-popup' ), 403 );
+            self::error( __( 'Security check failed. Please refresh the page.', 'auth-popup' ) );
         }
     }
 
@@ -1209,7 +1209,7 @@ class Auth_Popup_Ajax_Handler {
     private static function verify_form_guard(): void {
         $result = Auth_Popup_Form_Guard::verify();
         if ( is_wp_error( $result ) ) {
-            self::error( $result->get_error_message(), 403 );
+            self::error( $result->get_error_message() );
         }
     }
 
@@ -1224,7 +1224,7 @@ class Auth_Popup_Ajax_Handler {
     private static function check_lookup_rate_limit( string $bucket ): void {
         $result = Auth_Popup_OTP_Manager::check_ip_throttle( $bucket );
         if ( is_wp_error( $result ) ) {
-            self::error( $result->get_error_message(), 429 );
+            self::error( $result->get_error_message() );
         }
     }
 
