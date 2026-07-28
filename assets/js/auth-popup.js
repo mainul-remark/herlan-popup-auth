@@ -958,6 +958,11 @@
                             // gateway gated on email verification (e.g. Pay
                             // Later) appears without a full page reload.
                             $(document.body).trigger('update_checkout');
+                            // The bar's job is done — hide it shortly after
+                            // showing the success message.
+                            setTimeout(() => {
+                                $widget.fadeOut(300);
+                            }, 1500);
                         } else {
                             $widget.find('.ap-checkout-verify-error').remove();
                             $widget.append('<p class="ap-checkout-verify-error">' + res.data.message + '</p>');
