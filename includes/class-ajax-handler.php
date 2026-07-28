@@ -65,6 +65,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_send_otp(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         $phone   = sanitize_text_field( $_POST['phone']   ?? '' );
         $context = sanitize_text_field( $_POST['context'] ?? 'login' );
@@ -114,6 +115,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_login_password(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         if ( is_user_logged_in() ) {
             self::success( [ 'redirect' => self::redirect_url() ] );
@@ -149,6 +151,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_login_otp(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         if ( is_user_logged_in() ) {
             self::success( [ 'redirect' => self::redirect_url() ] );
@@ -187,6 +190,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_register(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         if ( is_user_logged_in() ) {
             self::success( [ 'redirect' => self::redirect_url() ] );
@@ -574,6 +578,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_verify_otp(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         $phone = sanitize_text_field( $_POST['phone'] ?? '' );
         $otp   = sanitize_text_field( $_POST['otp']   ?? '' );
@@ -599,6 +604,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_social_complete(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         if ( is_user_logged_in() ) {
             self::success( [ 'redirect' => self::redirect_url() ] );
@@ -666,6 +672,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_send_email_verify_code(): void {
         self::verify_nonce();
+        self::verify_form_guard();
         self::require_login();
 
         $user  = wp_get_current_user();
@@ -689,6 +696,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_verify_email_code(): void {
         self::verify_nonce();
+        self::verify_form_guard();
         self::require_login();
 
         $user = wp_get_current_user();
@@ -762,6 +770,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_forgot_password(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         $email = sanitize_email( $_POST['email'] ?? '' );
 
@@ -849,6 +858,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_verify_forgot_otp(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         $email = sanitize_email( $_POST['email'] ?? '' );
         $otp   = sanitize_text_field( $_POST['otp']   ?? '' );
@@ -899,6 +909,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_reset_password(): void {
         self::verify_nonce();
+        self::verify_form_guard();
 
         $reset_token      = sanitize_text_field( $_POST['reset_token']      ?? '' );
         $new_password     = $_POST['new_password']      ?? '';
@@ -944,6 +955,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_check_phone(): void {
         self::verify_nonce();
+        self::check_lookup_rate_limit( 'phone' );
 
         $phone = sanitize_text_field( $_POST['phone'] ?? '' );
         if ( ! Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
@@ -960,6 +972,7 @@ class Auth_Popup_Ajax_Handler {
 
     public static function auth_popup_check_email(): void {
         self::verify_nonce();
+        self::check_lookup_rate_limit( 'email' );
 
         $email = sanitize_email( $_POST['email'] ?? '' );
         if ( ! is_email( $email ) ) {
@@ -1182,6 +1195,36 @@ class Auth_Popup_Ajax_Handler {
     private static function verify_nonce(): void {
         if ( ! check_ajax_referer( 'auth_popup_nonce', 'nonce', false ) ) {
             self::error( __( 'Security check failed. Please refresh the page.', 'auth-popup' ), 403 );
+        }
+    }
+
+    /**
+     * Honeypot + timestamp-token check (Auth_Popup_Form_Guard). Layered on
+     * top of the nonce check for the OTP/email-verification entry points
+     * that are the most attractive targets for scripted abuse. Not applied
+     * to Google/Facebook auth, which are already strongly authenticated by
+     * a verified provider token and whose nonce check is intentionally
+     * non-blocking to tolerate cached guest pages (see auth_popup_google_auth).
+     */
+    private static function verify_form_guard(): void {
+        $result = Auth_Popup_Form_Guard::verify();
+        if ( is_wp_error( $result ) ) {
+            self::error( $result->get_error_message(), 403 );
+        }
+    }
+
+    /**
+     * Lightweight per-IP throttle for the phone/email lookup endpoints,
+     * which are called on every keystroke (debounced) and have no other
+     * rate limiting — without this they're an easy target for a request
+     * flood since they're cheap to reach (no login/nonce-token pairing
+     * beyond the standard nonce). Delegates to Auth_Popup_OTP_Manager so
+     * the REST API's equivalent endpoints share the same per-IP budget.
+     */
+    private static function check_lookup_rate_limit( string $bucket ): void {
+        $result = Auth_Popup_OTP_Manager::check_ip_throttle( $bucket );
+        if ( is_wp_error( $result ) ) {
+            self::error( $result->get_error_message(), 429 );
         }
     }
 

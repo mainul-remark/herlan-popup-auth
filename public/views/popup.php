@@ -62,6 +62,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
             <!-- Login: Password -->
             <?php if ( $en_pass ) : ?>
             <form class="ap-form ap-login-password-form active" id="ap-login-password-form" data-action="auth_popup_login_password" novalidate>
+                <?php Auth_Popup_Form_Guard::render_fields(); ?>
                 <div class="ap-field">
                     <div class="ap-input-wrap">
                         <svg class="ap-icon" viewBox="0 0 24 24" fill="none">
@@ -108,6 +109,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
             <!-- Login: OTP -->
             <?php if ( $en_otp ) : ?>
             <form class="ap-form ap-login-otp-form <?php echo $en_pass ? '' : 'active'; ?>" id="ap-login-otp-form" novalidate>
+                <?php Auth_Popup_Form_Guard::render_fields(); ?>
                 <div class="ap-otp-step active" data-step="1">
                     <div class="ap-field">
                         <div class="ap-input-wrap ap-phone-wrap">
@@ -181,6 +183,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
             </div>
 
             <form class="ap-form ap-register-form active" id="ap-register-form" data-action="auth_popup_register" novalidate>
+                <?php Auth_Popup_Form_Guard::render_fields(); ?>
 
                 <!-- ── Step 1: Basic info ──────────────────────────────── -->
                 <div class="ap-reg-step active" data-step="1">
@@ -514,6 +517,7 @@ $lostpass_url = esc_url( wp_lostpassword_url() );
             </div>
 
             <form id="ap-social-complete-form" autocomplete="off">
+                <?php Auth_Popup_Form_Guard::render_fields(); ?>
                 <input type="hidden" name="temp_token" id="ap-sc-temp-token">
 
                 <!-- Phase 1: Phone input (visible by default) -->

@@ -677,6 +677,11 @@ class Auth_Popup_REST_API {
     }
 
     public static function check_phone( WP_REST_Request $request ): WP_REST_Response {
+        $throttle = Auth_Popup_OTP_Manager::check_ip_throttle( 'phone' );
+        if ( is_wp_error( $throttle ) ) {
+            return self::error( $throttle->get_error_message(), 429 );
+        }
+
         $phone = $request->get_param( 'phone' );
 
         if ( ! Auth_Popup_SMS_Service::is_valid_phone( $phone ) ) {
@@ -690,6 +695,11 @@ class Auth_Popup_REST_API {
     }
 
     public static function check_email( WP_REST_Request $request ): WP_REST_Response {
+        $throttle = Auth_Popup_OTP_Manager::check_ip_throttle( 'email' );
+        if ( is_wp_error( $throttle ) ) {
+            return self::error( $throttle->get_error_message(), 429 );
+        }
+
         $email = $request->get_param( 'email' );
 
         if ( ! is_email( $email ) ) {

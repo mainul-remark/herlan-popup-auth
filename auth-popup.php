@@ -25,6 +25,7 @@ define( 'AUTH_POPUP_BASENAME', plugin_basename( __FILE__ ) );
 require_once AUTH_POPUP_PATH . 'includes/class-auth-popup-core.php';
 require_once AUTH_POPUP_PATH . 'includes/class-otp-manager.php';
 require_once AUTH_POPUP_PATH . 'includes/class-email-verification.php';
+require_once AUTH_POPUP_PATH . 'includes/class-form-guard.php';
 require_once AUTH_POPUP_PATH . 'includes/class-sms-service.php';
 require_once AUTH_POPUP_PATH . 'includes/class-user-auth.php';
 require_once AUTH_POPUP_PATH . 'includes/class-oauth-handler.php';

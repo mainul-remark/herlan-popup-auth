@@ -236,4 +236,33 @@ class Auth_Popup_OTP_Manager {
         }
         return '';
     }
+
+    /**
+     * Generic per-IP request throttle for lookup-style endpoints that have
+     * no other rate limiting of their own (e.g. phone/email existence
+     * checks). Shared by both the AJAX handler and the REST API — same
+     * transient key for a given $bucket + IP — so an attacker can't double
+     * their allowance by switching between the two surfaces.
+     *
+     * @return true|WP_Error
+     */
+    public static function check_ip_throttle( string $bucket, int $max_per_minute = 60 ) {
+        $ip = self::get_client_ip();
+        if ( empty( $ip ) ) {
+            return true; // cannot determine IP — skip check
+        }
+
+        $key   = 'ap_lk_' . $bucket . '_' . wp_hash( $ip );
+        $count = (int) get_transient( $key );
+
+        if ( $count >= $max_per_minute ) {
+            return new WP_Error(
+                'rate_limit_exceeded',
+                __( 'Too many requests. Please slow down and try again shortly.', 'auth-popup' )
+            );
+        }
+
+        set_transient( $key, $count + 1, MINUTE_IN_SECONDS );
+        return true;
+    }
 }

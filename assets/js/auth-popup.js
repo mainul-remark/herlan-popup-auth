@@ -243,6 +243,7 @@
                     nonce:   AuthPopup.nonce,
                     phone:   phone,
                     context: form,
+                    ...this.guardData(),
                 },
                 success: (res) => {
                     $btn.removeClass('ap-loading').prop('disabled', false);
@@ -412,6 +413,7 @@
                     nonce:   AuthPopup.nonce,
                     phone:   phone,
                     context: form,
+                    ...this.guardData(),
                 },
                 success: (res) => {
                     if (res.success) {
@@ -479,6 +481,16 @@
                 this.showStep('#ap-register-form', 3, '.ap-reg-step');
                 setTimeout(() => $('#ap-reg-password').focus(), 100);
             });
+        },
+
+        // Honeypot + timestamp-token fields for ajax calls that don't submit
+        // a native <form> (so serializeArray() can't pick the hidden fields
+        // up on its own). See Auth_Popup_Form_Guard on the PHP side.
+        guardData() {
+            const data = {};
+            data[AuthPopup.hpField] = '';
+            data[AuthPopup.tsField] = AuthPopup.tsToken;
+            return data;
         },
 
         submitForm($form, action, extraData = {}) {
@@ -913,6 +925,7 @@
                     data: {
                         action: 'auth_popup_send_email_verify_code',
                         nonce:  AuthPopup.nonce,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $sendBtn.removeClass('ap-loading').prop('disabled', false);
@@ -945,6 +958,7 @@
                         action: 'auth_popup_verify_email_code',
                         nonce:  AuthPopup.nonce,
                         code:   code,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $verifyBtn.removeClass('ap-loading').prop('disabled', false);
@@ -1074,6 +1088,7 @@
                         action: 'auth_popup_forgot_password',
                         nonce:  AuthPopup.nonce,
                         email:  email,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
@@ -1116,6 +1131,7 @@
                         nonce:  AuthPopup.nonce,
                         email:  this.fpEmail,
                         otp:    otp,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
@@ -1150,6 +1166,7 @@
                         action: 'auth_popup_forgot_password',
                         nonce:  AuthPopup.nonce,
                         email:  this.fpEmail,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         if (res.success) {
@@ -1203,6 +1220,7 @@
                         reset_token:      this.fpResetToken,
                         new_password:     newPass,
                         confirm_password: confPass,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
@@ -1279,6 +1297,7 @@
                         action: 'auth_popup_verify_email_code',
                         nonce:  AuthPopup.nonce,
                         code:   code,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
@@ -1304,6 +1323,7 @@
                     data: {
                         action: 'auth_popup_send_email_verify_code',
                         nonce:  AuthPopup.nonce,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         if (res.success) {
@@ -2269,6 +2289,7 @@
                         nonce:   AuthPopup.nonce,
                         phone:   phone,
                         context: 'social',
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
@@ -2321,6 +2342,7 @@
                         nonce:  AuthPopup.nonce,
                         phone:  phone,
                         otp:    otp,
+                        ...this.guardData(),
                     },
                     success: (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);

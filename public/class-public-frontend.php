@@ -139,6 +139,9 @@ class Auth_Popup_Public_Frontend {
         wp_localize_script( 'auth-popup', 'AuthPopup', [
             'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
             'nonce'           => wp_create_nonce( 'auth_popup_nonce' ),
+            'hpField'         => Auth_Popup_Form_Guard::HONEYPOT_FIELD,
+            'tsField'         => Auth_Popup_Form_Guard::TOKEN_FIELD,
+            'tsToken'         => Auth_Popup_Form_Guard::issue_token(),
             'redirectUrl'     => esc_url( ( is_ssl() ? 'https' : 'http' ) . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] ),
             'triggerSelector' => $s['trigger_selector'] ?? '.auth-popup-trigger',
             'googleClientId'  => $s['enable_google'] === '1' ? ( $s['google_client_id'] ?? '' ) : '',
