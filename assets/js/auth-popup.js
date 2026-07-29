@@ -106,12 +106,24 @@
         open() {
             this.$overlay.fadeIn(180);
             $('body').addClass('ap-no-scroll');
+            this.unlockTabs();
             this.$dialog.find('.ap-tab').first().trigger('click');
             this.clearAlert();
             // Trap focus
             setTimeout(() => {
                 this.$dialog.find('input:first').focus();
             }, 220);
+        },
+
+        /* ── Tab bar lock (post-auth steps: email-verify, social-complete) ──
+         * Prevents users from clicking back into Login/Register while
+         * finishing a verification step they've already started. */
+        lockTabs() {
+            this.$ctx.find('.ap-tabs').addClass('ap-tabs-locked');
+        },
+
+        unlockTabs() {
+            this.$ctx.find('.ap-tabs').removeClass('ap-tabs-locked');
         },
 
         close() {
@@ -1271,6 +1283,7 @@
             this.$ctx.find('.ap-tab').removeClass('active');
             this.$ctx.find('.ap-panel').removeClass('active');
             $('#ap-panel-email-verify').addClass('active');
+            this.lockTabs();
             $('#ap-ev-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
             this.clearAlert();
             if (this.$dialog) this.$dialog.scrollTop(0);
@@ -2187,8 +2200,10 @@
          */
         showSocialCompletePanel(data) {
             // Hide all panels, show the social-complete one
+            this.$ctx.find('.ap-tab').removeClass('active');
             this.$ctx.find('.ap-panel').removeClass('active');
             $('#ap-panel-social-complete').addClass('active');
+            this.lockTabs();
 
             // Store the temp token so it's submitted with the form
             $('#ap-sc-temp-token').val(data.temp_token || '');

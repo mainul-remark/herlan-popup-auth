@@ -104,6 +104,14 @@
     white-space: nowrap !important;
 }
 
+/* ── Locked tabs (email-verify / social-complete steps) ─────
+ * Once a user reaches a post-auth verification panel, hide the
+ * Login/Register tab bar so they can't navigate back into those
+ * forms mid-verification. */
+.ap-tabs.ap-tabs-locked {
+    display: none !important;
+}
+
 /* ── Close button (top right) ────────────────────────────── */
 .ap-close {
     position: absolute;
