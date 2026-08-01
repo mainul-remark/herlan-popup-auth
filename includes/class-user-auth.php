@@ -120,8 +120,11 @@ class Auth_Popup_User_Auth {
 
         $user = get_user_by( 'ID', $user_id );
 
-        // Send welcome email
-        wp_new_user_notification( $user_id, null, 'user' );
+        // Notify the admin only. The user already chose their own password
+        // during registration, so WordPress' core 'user' notification (a
+        // "click here to set your password" reset-key link) would be both
+        // pointless and confusable with the OTP email-verification flow.
+        wp_new_user_notification( $user_id, null, 'admin' );
 
         return self::do_login( $user );
     }

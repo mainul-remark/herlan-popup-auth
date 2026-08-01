@@ -505,6 +505,52 @@
             return data;
         },
 
+        refreshAuthNonce() {
+            return $.ajax({
+                url:    AuthPopup.ajaxUrl,
+                method: 'POST',
+                data:   { action: 'auth_popup_refresh_nonce' },
+            }).then((res) => {
+                if (res && res.success && res.data && res.data.nonce) {
+                    AuthPopup.nonce = res.data.nonce;
+                    return res;
+                }
+
+                return $.Deferred().reject().promise();
+            });
+        },
+
+        isNonceFailure(res) {
+            const message = res && res.data && res.data.message ? String(res.data.message) : '';
+            return message.indexOf('Security check failed') !== -1;
+        },
+
+        requestEmailVerification(action, data, onSuccess, onError, retried = false) {
+            $.ajax({
+                url:    AuthPopup.ajaxUrl,
+                method: 'POST',
+                data: {
+                    action,
+                    nonce: AuthPopup.nonce,
+                    ...data,
+                    ...this.guardData(),
+                },
+            }).done((res) => {
+                if (!res.success && !retried && this.isNonceFailure(res)) {
+                    this.refreshAuthNonce()
+                        .done(() => this.requestEmailVerification(action, data, onSuccess, onError, true))
+                        .fail(() => onError(res));
+                    return;
+                }
+
+                if (res.success) {
+                    onSuccess(res);
+                } else {
+                    onError(res);
+                }
+            }).fail(() => onError(null));
+        },
+
         submitForm($form, action, extraData = {}) {
             const $btn = $form.find('.ap-submit-btn');
             $btn.addClass('ap-loading').prop('disabled', true);
@@ -530,7 +576,19 @@
                         this.showAlert('success', res.data.message || AuthPopup.i18n.success);
                         const redirectUrl = res.data.redirect || AuthPopup.redirectUrl;
                         if (res.data.needs_email_verification) {
-                            setTimeout(() => this.showEmailVerifyPanel(redirectUrl), 800);
+                            // This action just logged the user in, which rotates the
+                            // session token that WordPress nonces are tied to. The
+                            // nonce localized on page load (while still a guest) is
+                            // now stale, so the email-verify panel's resend/verify
+                            // calls would fail with "Security check failed" until a
+                            // fresh nonce is fetched for the new logged-in session.
+                            this.refreshAuthNonce()
+                                .done(() => {
+                                    setTimeout(() => this.showEmailVerifyPanel(redirectUrl), 800);
+                                })
+                                .fail(() => {
+                                    this.showAlert('error', this.i18n('Your session was updated, but email verification could not be prepared. Please refresh the page and try again.'));
+                                });
                         } else {
                             setTimeout(() => {
                                 this.redirectAfterLogin(redirectUrl);
@@ -1303,51 +1361,32 @@
                 $btn.addClass('ap-loading').prop('disabled', true);
                 this.clearAlert();
 
-                $.ajax({
-                    url:    AuthPopup.ajaxUrl,
-                    method: 'POST',
-                    data: {
-                        action: 'auth_popup_verify_email_code',
-                        nonce:  AuthPopup.nonce,
-                        code:   code,
-                        ...this.guardData(),
-                    },
-                    success: (res) => {
+                this.requestEmailVerification(
+                    'auth_popup_verify_email_code',
+                    { code },
+                    (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
-                        if (res.success) {
-                            this.showAlert('success', res.data.message);
-                            setTimeout(() => this.redirectAfterLogin(this._evPendingRedirect), 800);
-                        } else {
-                            this.showAlert('error', res.data.message);
-                        }
+                        this.showAlert('success', res.data.message);
+                        setTimeout(() => this.redirectAfterLogin(this._evPendingRedirect), 800);
                     },
-                    error: () => {
+                    (res) => {
                         $btn.removeClass('ap-loading').prop('disabled', false);
-                        this.showAlert('error', AuthPopup.i18n.error_network);
-                    },
-                });
+                        this.showAlert('error', res && res.data ? res.data.message : AuthPopup.i18n.error_network);
+                    }
+                );
             });
 
             this.$ctx.on('click', '#ap-ev-resend-btn', () => {
                 this.clearAlert();
-                $.ajax({
-                    url:    AuthPopup.ajaxUrl,
-                    method: 'POST',
-                    data: {
-                        action: 'auth_popup_send_email_verify_code',
-                        nonce:  AuthPopup.nonce,
-                        ...this.guardData(),
+                this.requestEmailVerification(
+                    'auth_popup_send_email_verify_code',
+                    {},
+                    (res) => {
+                        $('#ap-ev-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
+                        this.showAlert('success', res.data.message);
                     },
-                    success: (res) => {
-                        if (res.success) {
-                            $('#ap-ev-otp-inputs .ap-otp-digit').val('').removeClass('ap-filled');
-                            this.showAlert('success', res.data.message);
-                        } else {
-                            this.showAlert('error', res.data.message);
-                        }
-                    },
-                    error: () => this.showAlert('error', AuthPopup.i18n.error_network),
-                });
+                    (res) => this.showAlert('error', res && res.data ? res.data.message : AuthPopup.i18n.error_network)
+                );
             });
 
             this.$ctx.on('click', '#ap-ev-skip-btn', () => {

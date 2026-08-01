@@ -257,6 +257,12 @@ class Auth_Popup_Email_Verification {
      * (fixes invalid dev/local From addresses) and error-capturing listener.
      * This is the single mail-sending path for this feature.
      *
+     * Registration fires this right after wp_new_user_notification() for the
+     * same user, and some SMTP providers (e.g. Mailtrap's sandbox/testing
+     * tier) throttle back-to-back sends with a transient "too many
+     * emails"-type rejection. A couple of short-backoff retries absorb that
+     * without affecting normal SMTP providers, which succeed on the first try.
+     *
      * @return true|WP_Error
      */
     private static function send_mail( string $to, string $subject, string $body ) {
@@ -277,16 +283,42 @@ class Auth_Popup_Email_Verification {
         };
         add_filter( 'wp_mail_from', $from_sanitizer, PHP_INT_MAX );
 
-        $mail_error     = null;
-        $error_listener = function ( WP_Error $err ) use ( &$mail_error ) {
-            $mail_error = $err->get_error_message();
-        };
-        add_action( 'wp_mail_failed', $error_listener );
+        $mail_error = null;
+        $attempts   = 3;
+        $delays     = [ 2, 3 ]; // seconds to wait before retry 2 and retry 3
 
-        $sent = wp_mail( $to, $subject, $body, $headers );
+        for ( $attempt = 1; $attempt <= $attempts; $attempt++ ) {
+            $mail_error     = null;
+            $error_listener = function ( WP_Error $err ) use ( &$mail_error ) {
+                $mail_error = $err->get_error_message();
+            };
+            add_action( 'wp_mail_failed', $error_listener );
+
+            $sent = wp_mail( $to, $subject, $body, $headers );
+
+            remove_action( 'wp_mail_failed', $error_listener );
+
+            if ( $sent ) {
+                break;
+            }
+
+            // A failed send can leave WordPress' shared PHPMailer SMTP
+            // connection (reused across wp_mail() calls in the same request)
+            // in a broken mid-transaction state. Without closing it, the next
+            // attempt issues a new MAIL FROM on top of the stuck transaction
+            // and fails with an unrelated "503 nested MAIL command" error
+            // instead of actually retrying. Force it closed so the retry
+            // reconnects cleanly.
+            if ( isset( $GLOBALS['phpmailer'] ) && is_object( $GLOBALS['phpmailer'] ) && method_exists( $GLOBALS['phpmailer'], 'smtpClose' ) ) {
+                $GLOBALS['phpmailer']->smtpClose();
+            }
+
+            if ( $attempt < $attempts ) {
+                sleep( $delays[ $attempt - 1 ] );
+            }
+        }
 
         remove_filter( 'wp_mail_from', $from_sanitizer, PHP_INT_MAX );
-        remove_action( 'wp_mail_failed', $error_listener );
 
         if ( ! $sent ) {
             return new WP_Error(
