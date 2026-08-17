@@ -6,6 +6,11 @@ defined( 'ABSPATH' ) || exit;
  *
  * Base: /wp-json/auth-popup/v1/
  *
+ * Every request must include:
+ *   X-API-Key: <auth-popup rest_api_key setting> (skipped if unset)
+ *   Woo-Consumer-Key: <WooCommerce REST API consumer key>
+ *   Woo-Consumer-Secret: <WooCommerce REST API consumer secret>
+ *
  * Auth (public):
  *   POST   /auth/send-otp
  *   POST   /auth/login
@@ -1142,20 +1147,68 @@ class Auth_Popup_REST_API {
         }
 
         $configured_key = (string) Auth_Popup_Core::get_setting( 'rest_api_key', '' );
-        if ( empty( $configured_key ) ) {
-            return $result;
+        if ( ! empty( $configured_key ) ) {
+            $provided_key = trim( (string) $request->get_header( 'x-api-key' ) );
+            if ( empty( $provided_key ) || ! hash_equals( $configured_key, $provided_key ) ) {
+                return new WP_Error(
+                    'rest_forbidden_api_key',
+                    __( 'Invalid or missing API key.', 'auth-popup' ),
+                    [ 'status' => 403 ]
+                );
+            }
         }
 
-        $provided_key = trim( (string) $request->get_header( 'x-api-key' ) );
-        if ( empty( $provided_key ) || ! hash_equals( $configured_key, $provided_key ) ) {
+        $woo_check = self::validate_woo_consumer_key( $request );
+        if ( is_wp_error( $woo_check ) ) {
+            return $woo_check;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Validates the Woo-Consumer-Key / Woo-Consumer-Secret headers against
+     * WooCommerce's own REST API keys (wp_woocommerce_api_keys), the same
+     * credentials generated under WooCommerce → Settings → Advanced → REST API.
+     *
+     * Required on every auth-popup/v1 request, in addition to X-API-Key.
+     *
+     * @return true|WP_Error
+     */
+    private static function validate_woo_consumer_key( WP_REST_Request $request ) {
+        if ( ! function_exists( 'wc_api_hash' ) ) {
+            // WooCommerce isn't active — nothing to validate against.
+            return true;
+        }
+
+        $consumer_key    = trim( (string) $request->get_header( 'woo-consumer-key' ) );
+        $consumer_secret = trim( (string) $request->get_header( 'woo-consumer-secret' ) );
+
+        if ( empty( $consumer_key ) || empty( $consumer_secret ) ) {
             return new WP_Error(
-                'rest_forbidden_api_key',
-                __( 'Invalid or missing API key.', 'auth-popup' ),
+                'rest_forbidden_woo_key',
+                __( 'Missing WooCommerce consumer key/secret.', 'auth-popup' ),
                 [ 'status' => 403 ]
             );
         }
 
-        return $result;
+        global $wpdb;
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT consumer_secret FROM {$wpdb->prefix}woocommerce_api_keys WHERE consumer_key = %s",
+                wc_api_hash( $consumer_key )
+            )
+        );
+
+        if ( ! $row || ! hash_equals( (string) $row->consumer_secret, $consumer_secret ) ) {
+            return new WP_Error(
+                'rest_forbidden_woo_key',
+                __( 'Invalid WooCommerce consumer key or secret.', 'auth-popup' ),
+                [ 'status' => 403 ]
+            );
+        }
+
+        return true;
     }
 
     /**
