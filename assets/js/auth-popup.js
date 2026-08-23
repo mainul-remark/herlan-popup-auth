@@ -551,7 +551,7 @@
             }).fail(() => onError(null));
         },
 
-        submitForm($form, action, extraData = {}) {
+        submitForm($form, action, extraData = {}, retried = false) {
             const $btn = $form.find('.ap-submit-btn');
             $btn.addClass('ap-loading').prop('disabled', true);
             this.clearAlert();
@@ -571,6 +571,19 @@
                     redirect_to: AuthPopup.redirectUrl,
                 },
                 success: (res) => {
+                    // A cached guest page can serve a stale nonce (e.g. WP Rocket
+                    // page cache). Refresh it once and silently resubmit instead of
+                    // surfacing "Security check failed" for what the user did right.
+                    if (!res.success && !retried && this.isNonceFailure(res)) {
+                        this.refreshAuthNonce()
+                            .done(() => this.submitForm($form, action, extraData, true))
+                            .fail(() => {
+                                $btn.removeClass('ap-loading').prop('disabled', false);
+                                this.showAlert('error', res.data.message || 'Error occurred.');
+                            });
+                        return;
+                    }
+
                     $btn.removeClass('ap-loading').prop('disabled', false);
                     if (res.success) {
                         this.showAlert('success', res.data.message || AuthPopup.i18n.success);

@@ -446,7 +446,7 @@ curl -X POST "https://your-domain.com/wp-json/auth-popup/v1/auth/refresh" \
 #### Errors
 
 ```json
-// 401 — refresh token invalid or expired
+// 401 — refresh token invalid or expired (also covers a revoked/already-used token — rotation deletes it immediately, so replaying an old refresh_token hits this same error)
 {
   "success": false,
   "response_code": 401,
@@ -454,6 +454,22 @@ curl -X POST "https://your-domain.com/wp-json/auth-popup/v1/auth/refresh" \
   "data": {}
 }
 ```
+
+```json
+// 400 — refresh_token field missing from the request body
+{
+  "code": "rest_missing_callback_param",
+  "message": "Missing parameter(s): refresh_token",
+  "data": {
+    "status": 400,
+    "params": ["refresh_token"]
+  }
+}
+```
+
+> **Note:** the `400` case above is raised by WordPress's REST argument validation *before* the endpoint callback runs, so it does **not** use the [standard response envelope](#3-standard-response-envelope) (`success` / `response_code` / `data` keys). It's WP core's native `code` / `message` / `data.status` shape instead. Every other error from this endpoint uses the standard envelope. Check for the presence of `success` to tell the two shapes apart client-side.
+
+> **No rate limiting** is applied to `/auth/refresh` — only [§2.0](#20-woocommerce-consumer-keysecret-required-on-every-request) (Woo keys) and [§2.1](#21-api-key-required-on-every-request) (`X-API-Key`) gate this endpoint, same as every other route in this API.
 
 ---
 
